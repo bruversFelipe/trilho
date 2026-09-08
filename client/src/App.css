@@ -281,21 +281,56 @@
 }
 
 .chip {
+  display: flex;
+  align-items: center;
+  gap: 3px;
   font-size: 10px;
   padding: 2px 5px;
   border-radius: 4px;
   background: color-mix(in srgb, var(--chip-color) 18%, white);
-  color: color-mix(in srgb, var(--chip-color) 70%, black);
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   border-left: 3px solid var(--chip-color);
+  overflow: hidden;
 }
 
 .chip.is-done {
-  opacity: 0.5;
-  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+/* Same idea as .task-check: hidden until hover, stays visible once checked. */
+.chip-check {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  margin: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--chip-color);
+  color: white;
+  font-size: 7px;
+  line-height: 1;
+}
+
+.chip:hover .chip-check,
+.chip.is-done .chip-check {
+  display: flex;
+}
+
+.chip.is-done .chip-check {
+  background: var(--chip-color);
+}
+
+.chip-body {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  color: color-mix(in srgb, var(--chip-color) 70%, black);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .week-grid-scroll {

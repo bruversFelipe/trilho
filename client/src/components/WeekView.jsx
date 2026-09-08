@@ -77,19 +77,38 @@ export default function WeekView({ weekStart, refreshKey, onEditTask, onToggleCo
             return (
               <div key={key} className="week-allday-cell">
                 {items.map((task) => (
-                  <button
+                  <div
                     key={task.occurrenceId}
                     className={`chip${task.completed ? ' is-done' : ''}`}
                     style={{ '--chip-color': task.categoryColor }}
-                    onClick={() => onEditTask(task)}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       onToggleComplete(task);
                     }}
-                    title={task.title}
                   >
-                    {task.title}
-                  </button>
+                    <button
+                      type="button"
+                      className="chip-check"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleComplete(task);
+                      }}
+                      aria-label={task.completed ? 'Marcar como nao concluida' : 'Marcar como concluida'}
+                    >
+                      {task.completed ? '✓' : ''}
+                    </button>
+                    <button
+                      type="button"
+                      className="chip-body"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditTask(task);
+                      }}
+                      title={task.title}
+                    >
+                      {task.title}
+                    </button>
+                  </div>
                 ))}
               </div>
             );
