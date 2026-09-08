@@ -109,3 +109,8 @@ localStorage) decide se mostra `<AuthModal>` sobre o app com blur
   seguinte automaticamente. Não "consertar" isso sem confirmar.
 - **`.env` tem segredos reais** (Mongo Atlas + JWT secret) — nunca commitar,
   já está no `.gitignore` em `server/`, `client/` e na raiz.
+- **App está em produção de verdade**: cliente na Vercel (`trilho.me`), API no
+  Railway, mesmo cluster MongoDB Atlas. `DB_NAME` local é **`trilho_dev`**,
+  produção usa **`trilho`** — nunca rodar dev local com `DB_NAME=trilho`. Isso
+  já aconteceu uma vez (contas de teste criadas via automação local apareceram
+  no banco de produção) — mantenha esses dois sempre diferentes.
