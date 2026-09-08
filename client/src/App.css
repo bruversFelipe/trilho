@@ -228,12 +228,15 @@
   grid-template-columns: 36px repeat(7, 1fr);
 }
 
-.week-daybar {
-  padding: 0 8px;
+.week-sticky-header {
   position: sticky;
   top: 0;
-  background: var(--surface);
   z-index: 5;
+  background: var(--surface);
+}
+
+.week-daybar {
+  padding: 0 8px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -267,6 +270,7 @@
   padding: 4px 8px;
   gap: 2px;
   min-height: 20px;
+  border-bottom: 1px solid var(--border);
 }
 
 .week-allday-cell {

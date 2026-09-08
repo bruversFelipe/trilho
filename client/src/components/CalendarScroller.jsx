@@ -8,11 +8,12 @@ const ANCHOR = { week: startOfWeek, month: startOfMonth };
 const DEFAULT_WEEK_SCROLL_HOUR = 6; // land on 6am, not midnight - most people's day starts around there
 
 /** Scrolls `container` so `periodEl` (or, in week mode, its 6am row) sits just
- * below that period's sticky day-bar header, instead of jumping to midnight. */
+ * below that period's sticky header (day-bar + all-day row), instead of
+ * jumping to midnight. */
 function scrollToPeriod(container, periodEl, mode) {
   const anchor = mode === 'week' ? periodEl.querySelector(`[data-hour="${DEFAULT_WEEK_SCROLL_HOUR}"]`) : null;
   const target = anchor || periodEl;
-  const stickyHeader = periodEl.querySelector('.week-daybar');
+  const stickyHeader = periodEl.querySelector('.week-sticky-header');
   const headerOffset = stickyHeader ? stickyHeader.getBoundingClientRect().height : 0;
 
   const containerRect = container.getBoundingClientRect();

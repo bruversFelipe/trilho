@@ -58,41 +58,43 @@ export default function WeekView({ weekStart, refreshKey, onEditTask, onToggleCo
     <section className="week-block">
       <h2 className="period-label">{formatWeekRangeLabel(weekStart)}</h2>
 
-      <div className="week-daybar">
-        <div className="time-gutter-spacer" />
-        {days.map((day) => (
-          <div key={dateKey(day)} className={`week-daybar-cell${isToday(day) ? ' is-today' : ''}`}>
-            <span className="weekday-name">{WEEKDAY_LABELS[day.getUTCDay()]}</span>
-            <span className="weekday-num">{day.getUTCDate()}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="week-allday">
-        <div className="time-gutter-spacer" />
-        {days.map((day) => {
-          const key = dateKey(day);
-          const items = byDay[key]?.allDay || [];
-          return (
-            <div key={key} className="week-allday-cell">
-              {items.map((task) => (
-                <button
-                  key={task.occurrenceId}
-                  className={`chip${task.completed ? ' is-done' : ''}`}
-                  style={{ '--chip-color': task.categoryColor }}
-                  onClick={() => onEditTask(task)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    onToggleComplete(task);
-                  }}
-                  title={task.title}
-                >
-                  {task.title}
-                </button>
-              ))}
+      <div className="week-sticky-header">
+        <div className="week-daybar">
+          <div className="time-gutter-spacer" />
+          {days.map((day) => (
+            <div key={dateKey(day)} className={`week-daybar-cell${isToday(day) ? ' is-today' : ''}`}>
+              <span className="weekday-name">{WEEKDAY_LABELS[day.getUTCDay()]}</span>
+              <span className="weekday-num">{day.getUTCDate()}</span>
             </div>
-          );
-        })}
+          ))}
+        </div>
+
+        <div className="week-allday">
+          <div className="time-gutter-spacer" />
+          {days.map((day) => {
+            const key = dateKey(day);
+            const items = byDay[key]?.allDay || [];
+            return (
+              <div key={key} className="week-allday-cell">
+                {items.map((task) => (
+                  <button
+                    key={task.occurrenceId}
+                    className={`chip${task.completed ? ' is-done' : ''}`}
+                    style={{ '--chip-color': task.categoryColor }}
+                    onClick={() => onEditTask(task)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      onToggleComplete(task);
+                    }}
+                    title={task.title}
+                  >
+                    {task.title}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="week-grid-scroll">
