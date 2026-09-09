@@ -323,14 +323,27 @@
 }
 
 .chip-body {
+  display: flex;
+  align-items: center;
+  gap: 3px;
   flex: 1;
   min-width: 0;
   padding: 0;
   text-align: left;
   color: color-mix(in srgb, var(--chip-color) 70%, black);
-  white-space: nowrap;
+}
+
+.chip-title {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notes-icon {
+  flex-shrink: 0;
+  color: currentColor;
+  opacity: 0.6;
 }
 
 .week-grid-scroll {
@@ -427,7 +440,15 @@
   color: var(--text-dim);
 }
 
+.task-block-title-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
 .task-block-title {
+  min-width: 0;
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
@@ -587,6 +608,12 @@
   gap: 4px;
   text-align: left;
   flex: 1;
+}
+
+.goal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .goal-item.is-done .goal-title {

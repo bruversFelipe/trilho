@@ -10,6 +10,7 @@ import {
 } from '../utils/date.js';
 import { useTasksForRange } from '../hooks/useTasksForRange.js';
 import { layoutDayEvents } from '../utils/layout.js';
+import NotesIcon from './NotesIcon.jsx';
 
 const ROW_HEIGHT = 52; // px per hour
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -106,7 +107,8 @@ export default function WeekView({ weekStart, refreshKey, onEditTask, onToggleCo
                       }}
                       title={task.title}
                     >
-                      {task.title}
+                      <span className="chip-title">{task.title}</span>
+                      {task.description && <NotesIcon className="notes-icon" />}
                     </button>
                   </div>
                 ))}
@@ -196,7 +198,10 @@ export default function WeekView({ weekStart, refreshKey, onEditTask, onToggleCo
                         title={`${task.startTime} ${task.title}`}
                       >
                         <span className="task-block-time">{task.startTime}</span>
-                        <span className="task-block-title">{task.title}</span>
+                        <span className="task-block-title-row">
+                          <span className="task-block-title">{task.title}</span>
+                          {task.description && <NotesIcon className="notes-icon" />}
+                        </span>
                       </button>
                     </div>
                   );

@@ -2,6 +2,7 @@ import { addDays, formatWeekRangeLabel } from '../utils/date.js';
 import { firstName, getGreeting } from '../utils/greeting.js';
 import { useTasksForRange } from '../hooks/useTasksForRange.js';
 import TimeStatsBar from './TimeStatsBar.jsx';
+import NotesIcon from './NotesIcon.jsx';
 
 export default function GoalsPanel({
   className,
@@ -46,7 +47,10 @@ export default function GoalsPanel({
               {goal.completed ? '✓' : ''}
             </button>
             <button className="goal-text" onClick={() => onEditTask(goal)}>
-              <span className="goal-title">{goal.title}</span>
+              <span className="goal-title-row">
+                <span className="goal-title">{goal.title}</span>
+                {goal.description && <NotesIcon className="notes-icon" />}
+              </span>
               {goal.category && (
                 <span className="goal-category" style={{ '--chip-color': goal.categoryColor }}>
                   {goal.category}
