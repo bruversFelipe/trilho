@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import {
   addDays,
   dateKey,
-  formatWeekRangeLabel,
-  getWeekDays,
+  formatDaysRangeLabel,
+  getDays,
   isToday,
   timeToMinutes,
   WEEKDAY_LABELS,
@@ -22,10 +22,10 @@ function minutesToTime(totalMinutes) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-export default function WeekView({ weekStart, refreshKey, onEditTask, onToggleComplete, onCreateAt }) {
-  const weekEnd = addDays(weekStart, 6);
+export default function WeekView({ weekStart, dayCount = 7, refreshKey, onEditTask, onToggleComplete, onCreateAt }) {
+  const weekEnd = addDays(weekStart, dayCount - 1);
   const { tasks } = useTasksForRange(weekStart, weekEnd, refreshKey);
-  const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
+  const days = useMemo(() => getDays(weekStart, dayCount), [weekStart, dayCount]);
 
   const byDay = useMemo(() => {
     const map = {};
@@ -56,8 +56,8 @@ export default function WeekView({ weekStart, refreshKey, onEditTask, onToggleCo
   }
 
   return (
-    <section className="week-block">
-      <h2 className="period-label">{formatWeekRangeLabel(weekStart)}</h2>
+    <section className="week-block" style={{ '--day-count': dayCount }}>
+      <h2 className="period-label">{formatDaysRangeLabel(weekStart, dayCount)}</h2>
 
       <div className="week-sticky-header">
         <div className="week-daybar">

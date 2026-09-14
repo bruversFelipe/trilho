@@ -58,6 +58,8 @@ Componentes principais e seus papéis (não duplicar lógica entre eles):
   chama `useTasksForRange` internamente (não recebem tasks via prop).
 - `GoalsPanel.jsx` — recebe `weekStart` já pronto (não `focusDate`); quem
   decide qual semana mostrar é sempre o chamador.
+- `DensityPicker.jsx` — segmentado Dia/3 dias/Semana, só visível no mobile
+  (aba Semana). Controla `dayCount` (1/3/7), estado dono é o `App.jsx`.
 - `layout.js` (`layoutDayEvents`) — algoritmo de divisão de colunas pra
   tarefas com horário sobreposto (mesmo princípio do Google Calendar:
   clusters de sobreposição, cada tarefa vira `{ col, totalCols }`).
@@ -110,6 +112,20 @@ localStorage) decide se mostra `<AuthModal>` sobre o app com blur
   dois campos como query string. Editar a série inteira (`scope` omitido ou
   `'series'`) **precisa preservar** `excludedDates` ao sobrescrever
   `recurrence` — nunca substituir o objeto sem copiar esse array.
+- **Densidade mobile da semana (Dia/3 dias/Semana)**: `WeekView` recebe
+  `dayCount` (1, 3 ou 7) e usa `getDays`/`formatDaysRangeLabel` genéricos em
+  vez dos antigos `getWeekDays`/`formatWeekRangeLabel` (que continuam existindo,
+  só que agora são casos particulares com `count=7` — `GoalsPanel` ainda usa a
+  versão de semana cheia, sem `dayCount`, porque metas continuam sempre por
+  semana). `CalendarScroller` também depende de `dayCount`: com 7 dias o passo
+  do scroll infinito continua ancorado no domingo (`startOfWeek`); com 1 ou 3
+  dias o passo **não alinha com a semana** — pula exatamente `dayCount` dias a
+  partir do dia focado (decisão explícita do usuário, não "consertar" achando
+  que devia fatiar a semana em blocos fixos). O grid CSS usa a var
+  `--day-count` (setada inline em `.week-block`) em vez de `repeat(7, 1fr)`
+  fixo. A escolha do usuário fica em `localStorage` (`trilho:calendarDensity`)
+  e o seletor (`DensityPicker`) some no desktop via o mesmo breakpoint de
+  900px que já escondia a aba Metas mobile.
 - **`username` nunca é digitado**, é sempre `slugify(name)` calculado no
   backend (nunca confiar em slug vindo do client). Front só faz preview via
   `GET /auth/slug-availability`.

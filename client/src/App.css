@@ -153,7 +153,35 @@
 .calendar-pane {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mobile-only "Dia / 3 dias / Semana" density switch for the week view (hidden
+   at desktop widths below, next to the other mobile-vs-desktop rules). */
+.density-picker {
+  flex-shrink: 0;
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px 0;
+}
+
+.density-option {
+  flex: 1;
+  padding: 6px 4px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.density-option.is-active {
+  background: var(--text);
+  color: var(--surface);
+  border-color: var(--text);
 }
 
 /* The goals sidebar only shows up at desktop widths (see media query below);
@@ -163,7 +191,8 @@
 }
 
 .calendar-scroller {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -225,7 +254,9 @@
 .week-allday,
 .week-grid {
   display: grid;
-  grid-template-columns: 36px repeat(7, 1fr);
+  /* --day-count is set inline on .week-block (defaults to 7, the full week) so the
+     mobile "dia"/"3 dias" densities can narrow the grid without extra CSS rules. */
+  grid-template-columns: 36px repeat(var(--day-count, 7), 1fr);
 }
 
 .week-sticky-header {
@@ -741,6 +772,12 @@
   }
 
   .goals-mobile-tab {
+    display: none;
+  }
+
+  /* Desktop is wide enough to always show the full week - the density switch
+     is a mobile-only affordance. */
+  .density-picker {
     display: none;
   }
 

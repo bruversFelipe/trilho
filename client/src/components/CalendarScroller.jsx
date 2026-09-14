@@ -1,11 +1,22 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { addDays, addMonths, dateKey, startOfMonth, startOfWeek } from '../utils/date.js';
 import WeekView from './WeekView.jsx';
 import MonthView from './MonthView.jsx';
 
-const STEP = { week: (d, n) => addDays(d, 7 * n), month: (d, n) => addMonths(d, n) };
-const ANCHOR = { week: startOfWeek, month: startOfMonth };
 const DEFAULT_WEEK_SCROLL_HOUR = 6; // land on 6am, not midnight - most people's day starts around there
+
+/** Week mode's step/anchor depend on `dayCount` (the mobile "dia"/"3 dias"/"semana"
+ * density - see DensityPicker): a full week always snaps to Sunday so it reads as
+ * "the" week, but the narrower densities step by their own size starting from
+ * whatever day is focused, with no week alignment (confirmed behavior, not a bug). */
+function stepFor(mode, dayCount) {
+  return mode === 'week' ? (d, n) => addDays(d, dayCount * n) : (d, n) => addMonths(d, n);
+}
+
+function anchorFor(mode, dayCount) {
+  if (mode !== 'week') return startOfMonth;
+  return dayCount === 7 ? startOfWeek : (d) => d;
+}
 
 /** Scrolls `container` so `periodEl` (or, in week mode, its 6am row) sits just
  * below that period's sticky header (day-bar + all-day row), instead of
@@ -24,6 +35,7 @@ function scrollToPeriod(container, periodEl, mode) {
 export default function CalendarScroller({
   mode,
   focusDate,
+  dayCount = 7,
   jumpToken,
   refreshKey,
   onEditTask,
@@ -32,8 +44,10 @@ export default function CalendarScroller({
   onVisiblePeriodChange,
   onCreateAt,
 }) {
-  const step = STEP[mode];
-  const anchor = ANCHOR[mode];
+  // Memoized so effects keyed on these (the intersection observer below) don't tear
+  // down and rebuild on every unrelated re-render - only when mode/dayCount actually change.
+  const step = useMemo(() => stepFor(mode, dayCount), [mode, dayCount]);
+  const anchor = useMemo(() => anchorFor(mode, dayCount), [mode, dayCount]);
 
   const [periods, setPeriods] = useState(() => {
     const base = anchor(focusDate);
@@ -49,24 +63,28 @@ export default function CalendarScroller({
   const pendingCenterRef = useRef(true); // scroll to the current period once, on mount
   const lastFocusKeyRef = useRef(dateKey(focusDate));
   const lastJumpTokenRef = useRef(jumpToken);
+  const lastDayCountRef = useRef(dayCount);
 
-  // Recenter when the caller jumps to a different date (e.g. picking a day in Month view)
-  // or explicitly asks to jump back to the current period (e.g. the "Hoje" button), even
-  // if the date itself didn't change since we might just be scrolled away from it.
+  // Recenter when the caller jumps to a different date (e.g. picking a day in Month view),
+  // explicitly asks to jump back to the current period (e.g. the "Hoje" button), or switches
+  // the mobile density (dia/3 dias/semana) - even if the date itself didn't change, since we
+  // might just be scrolled away from it or the period size itself just changed.
   useEffect(() => {
     const key = dateKey(focusDate);
     const dateChanged = key !== lastFocusKeyRef.current;
     const jumped = jumpToken !== lastJumpTokenRef.current;
-    if (!dateChanged && !jumped) return;
+    const densityChanged = dayCount !== lastDayCountRef.current;
+    if (!dateChanged && !jumped && !densityChanged) return;
 
     lastFocusKeyRef.current = key;
     lastJumpTokenRef.current = jumpToken;
+    lastDayCountRef.current = dayCount;
     const base = anchor(focusDate);
     centerKeyRef.current = dateKey(base);
     pendingCenterRef.current = true;
     setPeriods([step(base, -1), base, step(base, 1), step(base, 2)]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateKey(focusDate), jumpToken, mode]);
+  }, [dateKey(focusDate), jumpToken, dayCount, mode]);
 
   useLayoutEffect(() => {
     if (pendingCenterRef.current && containerRef.current) {
@@ -173,6 +191,7 @@ export default function CalendarScroller({
           <div key={key} ref={(el) => (periodRefs.current[key] = el)}>
             <View
               {...{ [propName]: periodStart }}
+              dayCount={dayCount}
               refreshKey={refreshKey}
               onEditTask={onEditTask}
               onToggleComplete={onToggleComplete}

@@ -57,8 +57,14 @@ export function isToday(date) {
   return isSameDay(date, today());
 }
 
+/** `count` consecutive calendar days starting at `start` (used for the week grid,
+ * and for the narrower "3 dias"/"dia" mobile densities - see getWeekDays below). */
+export function getDays(start, count) {
+  return Array.from({ length: count }, (_, i) => addDays(start, i));
+}
+
 export function getWeekDays(weekStart) {
-  return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  return getDays(weekStart, 7);
 }
 
 /** Returns an array of 6 weeks (each 7 days) fully covering the month of `monthStart`. */
@@ -74,13 +80,24 @@ export function getMonthGrid(monthStart) {
 }
 
 export function formatWeekRangeLabel(weekStart) {
-  const end = addDays(weekStart, 6);
-  const sameMonth = weekStart.getUTCMonth() === end.getUTCMonth();
-  const startLabel = `${weekStart.getUTCDate()}`;
+  return formatDaysRangeLabel(weekStart, 7);
+}
+
+/** Like formatWeekRangeLabel, but for an arbitrary block of `count` days - used by
+ * the mobile "dia"/"3 dias" densities in WeekView. A single day gets its own,
+ * simpler label (weekday name included, since there's no range to imply it). */
+export function formatDaysRangeLabel(start, count) {
+  if (count === 1) {
+    return `${WEEKDAY_LABELS[start.getUTCDay()]}, ${start.getUTCDate()} de ${MONTH_LABELS[start.getUTCMonth()]} de ${start.getUTCFullYear()}`;
+  }
+
+  const end = addDays(start, count - 1);
+  const sameMonth = start.getUTCMonth() === end.getUTCMonth();
+  const startLabel = `${start.getUTCDate()}`;
   const endLabel = `${end.getUTCDate()} de ${MONTH_LABELS[end.getUTCMonth()]}`;
   return sameMonth
-    ? `${startLabel} - ${endLabel} de ${weekStart.getUTCFullYear()}`
-    : `${startLabel} de ${MONTH_LABELS[weekStart.getUTCMonth()]} - ${endLabel}`;
+    ? `${startLabel} - ${endLabel} de ${start.getUTCFullYear()}`
+    : `${startLabel} de ${MONTH_LABELS[start.getUTCMonth()]} - ${endLabel}`;
 }
 
 export function timeToMinutes(time) {

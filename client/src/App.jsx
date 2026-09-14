@@ -3,6 +3,7 @@ import CalendarScroller from './components/CalendarScroller.jsx';
 import GoalsPanel from './components/GoalsPanel.jsx';
 import TaskModal from './components/TaskModal.jsx';
 import AuthModal from './components/AuthModal.jsx';
+import DensityPicker from './components/DensityPicker.jsx';
 import {
   getCategories,
   createTask,
@@ -17,12 +18,23 @@ import {
 import { dateKey, startOfWeek, today } from './utils/date.js';
 import './App.css';
 
+const DAY_COUNT_KEY = 'trilho:calendarDensity'; // mobile week density: 1 / 3 / 7 days at a time
+
+function loadStoredDayCount() {
+  const stored = Number(localStorage.getItem(DAY_COUNT_KEY));
+  return [1, 3, 7].includes(stored) ? stored : 7;
+}
+
 function App() {
   const [tab, setTab] = useState('week'); // 'week' | 'month' | 'goals'
   const [focusDate, setFocusDate] = useState(() => today());
   // The week currently at the top of the week-view scroll - the goals panel follows
   // this instead of focusDate, so scrolling ahead lets you add goals for future weeks.
   const [visibleWeekStart, setVisibleWeekStart] = useState(() => startOfWeek(today()));
+  // Mobile-only "Dia / 3 dias / Semana" density for the week view (see DensityPicker);
+  // persisted per-device so it sticks across reloads. Ignored at desktop widths (CSS
+  // hides the picker there and the week view always renders 7 days regardless).
+  const [dayCount, setDayCount] = useState(loadStoredDayCount);
   const [categories, setCategories] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [modalState, setModalState] = useState(null); // { task, defaultDate, forceGoal } | null
@@ -136,6 +148,11 @@ function App() {
     setTab('week');
   }
 
+  function handleSetDayCount(n) {
+    setDayCount(n);
+    localStorage.setItem(DAY_COUNT_KEY, String(n));
+  }
+
   function handleGoToday() {
     setFocusDate(today());
     setVisibleWeekStart(startOfWeek(today()));
@@ -178,15 +195,17 @@ function App() {
 
         <main className="app-main">
           <div className="calendar-pane">
+            {tab === 'week' && <DensityPicker value={dayCount} onChange={handleSetDayCount} />}
             {tab === 'week' && (
               <CalendarScroller
                 mode="week"
                 focusDate={focusDate}
+                dayCount={dayCount}
                 jumpToken={jumpToken}
                 refreshKey={refreshKey}
                 onEditTask={handleEditTask}
                 onToggleComplete={handleToggleComplete}
-                onVisiblePeriodChange={setVisibleWeekStart}
+                onVisiblePeriodChange={(period) => setVisibleWeekStart(startOfWeek(period))}
                 onCreateAt={handleCreateAt}
               />
             )}
