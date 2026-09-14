@@ -101,6 +101,15 @@ localStorage) decide se mostra `<AuthModal>` sobre o app com blur
 - **`recurrence` seriesStart usa início de semana, não o dia exato** — criar
   uma tarefa "repete seg/qua/sex" numa quinta não deve esconder o
   segunda/quarta daquela mesma semana. Ver `server/src/utils/recurrence.js`.
+- **Editar/excluir "somente esta ocorrência" de uma série usa o padrão de
+  exceção do Google Calendar**: a data vai pra `recurrence.excludedDates` da
+  série (some da expansão) e, se foi uma edição (não exclusão), nasce uma
+  Task avulsa nova (`recurrence.enabled: false`) só com aquela data — ela não
+  tem mais nenhum vínculo com a série original. `PUT /tasks/:id` aceita
+  `{ scope: 'single', occurrenceDate }` pra isso; `DELETE` aceita os mesmos
+  dois campos como query string. Editar a série inteira (`scope` omitido ou
+  `'series'`) **precisa preservar** `excludedDates` ao sobrescrever
+  `recurrence` — nunca substituir o objeto sem copiar esse array.
 - **`username` nunca é digitado**, é sempre `slugify(name)` calculado no
   backend (nunca confiar em slug vindo do client). Front só faz preview via
   `GET /auth/slug-availability`.

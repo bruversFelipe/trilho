@@ -100,10 +100,19 @@ function App() {
     }
   }
 
-  async function handleDelete(task) {
-    if (!confirm(`Excluir "${task.title}"?`)) return;
+  async function handleDelete(task, scope) {
+    const isSingleOccurrence = scope === 'single' && task.recurrence?.enabled;
+    const confirmMsg = isSingleOccurrence
+      ? `Excluir "${task.title}" so nesse dia?`
+      : `Excluir "${task.title}"?`;
+    if (!confirm(confirmMsg)) return;
+
     try {
-      await deleteTask(task._id);
+      if (isSingleOccurrence) {
+        await deleteTask(task._id, { scope: 'single', occurrenceDate: dateKey(task.date) });
+      } else {
+        await deleteTask(task._id);
+      }
       bump();
       setModalState(null);
     } catch (err) {

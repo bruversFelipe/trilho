@@ -121,6 +121,12 @@ export async function updateTask(req, res) {
   const task = await Task.findOne({ _id: id, userId: req.userId });
   if (!task) return res.status(404).json({ error: 'Task not found' });
 
+  // Editing just one occurrence of a recurring series: detach that date into
+  // its own standalone task, and make the series skip it from now on.
+  if (task.recurrence?.enabled && body.scope === 'single') {
+    return detachOccurrence(req, res, task, body);
+  }
+
   if (body.category !== undefined || body.categoryId !== undefined) {
     const category = await resolveCategory(req.userId, body);
     if (category) {
@@ -150,6 +156,7 @@ export async function updateTask(req, res) {
       enabled: !!body.recurrence.enabled,
       daysOfWeek: body.recurrence.daysOfWeek || [],
       endDate: body.recurrence.endDate ? new Date(body.recurrence.endDate) : null,
+      excludedDates: task.recurrence.excludedDates, // preserve - a full recurrence edit shouldn't un-detach past exceptions
     };
   }
 
@@ -157,8 +164,57 @@ export async function updateTask(req, res) {
   res.json(task);
 }
 
+async function detachOccurrence(req, res, seriesTask, body) {
+  if (!body.occurrenceDate) {
+    return res.status(400).json({ error: 'occurrenceDate is required when scope is single' });
+  }
+
+  const category = await resolveCategory(req.userId, body);
+
+  const detached = await Task.create({
+    userId: req.userId,
+    title: body.title,
+    description: body.description || '',
+    date: new Date(body.date),
+    startTime: body.startTime || null,
+    endTime: body.endTime || null,
+    allDay: !!body.allDay,
+    isGoal: !!body.isGoal,
+    category: category?.name || '',
+    categoryColor: category?.color || '#6366f1',
+    categoryId: category?._id || null,
+    recurrence: { enabled: false, daysOfWeek: [], endDate: null, excludedDates: [] },
+  });
+
+  excludeDateFromSeries(seriesTask, body.occurrenceDate);
+  await seriesTask.save();
+
+  res.status(201).json(detached);
+}
+
+function excludeDateFromSeries(seriesTask, occurrenceDate) {
+  const key = toDateOnlyString(occurrenceDate);
+  const already = seriesTask.recurrence.excludedDates.some((d) => toDateOnlyString(d) === key);
+  if (!already) {
+    seriesTask.recurrence.excludedDates.push(parseDateOnly(key));
+  }
+}
+
 export async function deleteTask(req, res) {
   const { id } = req.params;
+  const { scope, occurrenceDate } = req.query;
+
+  if (scope === 'single' && occurrenceDate) {
+    const task = await Task.findOne({ _id: id, userId: req.userId });
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+
+    if (task.recurrence?.enabled) {
+      excludeDateFromSeries(task, occurrenceDate);
+      await task.save();
+      return res.status(204).send();
+    }
+  }
+
   const deleted = await Task.findOneAndDelete({ _id: id, userId: req.userId });
   if (!deleted) return res.status(404).json({ error: 'Task not found' });
   res.status(204).send();

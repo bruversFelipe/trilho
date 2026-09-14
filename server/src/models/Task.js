@@ -21,6 +21,9 @@ const taskSchema = new mongoose.Schema(
       enabled: { type: Boolean, default: false },
       daysOfWeek: { type: [Number], default: [] }, // 0=Sun ... 6=Sat
       endDate: { type: Date, default: null },
+      // Dates skipped by this series because that single occurrence was
+      // "detached" into its own standalone Task (edited/deleted individually).
+      excludedDates: { type: [Date], default: [] },
     },
 
     completed: { type: Boolean, default: false },

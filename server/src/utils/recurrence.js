@@ -26,10 +26,17 @@ export function expandTasks(tasks, rangeStart, rangeEnd) {
     const seriesEnd = task.recurrence.endDate ? new Date(task.recurrence.endDate) : null;
     if (seriesEnd) seriesEnd.setUTCHours(23, 59, 59, 999);
 
+    // Dates "detached" into their own standalone Task (edited/deleted individually)
+    // don't come from the series anymore - the standalone task shows up on its own.
+    const excluded = new Set(
+      (task.recurrence.excludedDates || []).map((d) => toDateOnlyString(d))
+    );
+
     for (const day of days) {
       if (day < seriesStart) continue;
       if (seriesEnd && day > seriesEnd) continue;
       if (!task.recurrence.daysOfWeek.includes(day.getUTCDay())) continue;
+      if (excluded.has(toDateOnlyString(day))) continue;
 
       occurrences.push(toOccurrence(task, day));
     }

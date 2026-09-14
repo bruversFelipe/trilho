@@ -894,6 +894,42 @@
   border-color: var(--text);
 }
 
+.edit-scope-picker {
+  margin: -4px 0 4px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.edit-scope-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.edit-scope-options {
+  display: flex;
+  gap: 4px;
+}
+
+.edit-scope-option {
+  flex: 1;
+  padding: 7px 4px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.edit-scope-option.is-active {
+  background: var(--text);
+  color: var(--surface);
+  border-color: var(--text);
+}
+
 .modal-actions {
   display: flex;
   justify-content: space-between;

@@ -86,8 +86,12 @@ export function updateTask(id, task) {
   return request(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(task) });
 }
 
-export function deleteTask(id) {
-  return request(`/tasks/${id}`, { method: 'DELETE' });
+export function deleteTask(id, { scope, occurrenceDate } = {}) {
+  const params = new URLSearchParams();
+  if (scope) params.set('scope', scope);
+  if (occurrenceDate) params.set('occurrenceDate', occurrenceDate);
+  const qs = params.toString();
+  return request(`/tasks/${id}${qs ? `?${qs}` : ''}`, { method: 'DELETE' });
 }
 
 export function completeTask(id, date, completed) {

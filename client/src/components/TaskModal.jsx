@@ -3,6 +3,11 @@ import { dateKey, today, WEEKDAY_LABELS } from '../utils/date.js';
 
 const DEFAULT_COLOR = '#6366f1';
 
+function formatShortDate(date) {
+  const d = new Date(date);
+  return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 function buildInitialState(task, defaultDate, forceGoal, defaultStartTime, defaultEndTime) {
   if (task) {
     return {
@@ -56,6 +61,11 @@ export default function TaskModal({
     buildInitialState(task, defaultDate, forceGoal, defaultStartTime, defaultEndTime)
   );
   const isEditing = !!task;
+  const isRecurringInstance = isEditing && !!task.recurrence?.enabled;
+  // Editing one occurrence of a series: default to "just this day" - that's the
+  // whole point of picking a single block on the calendar to edit.
+  const [editScope, setEditScope] = useState('single');
+  const editingSingleOccurrence = isRecurringInstance && editScope === 'single';
 
   function update(patch) {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -95,6 +105,11 @@ export default function TaskModal({
       },
     };
 
+    if (editingSingleOccurrence) {
+      payload.scope = 'single';
+      payload.occurrenceDate = dateKey(task.date);
+    }
+
     onSave(payload, task);
   }
 
@@ -109,6 +124,28 @@ export default function TaskModal({
         </div>
 
         <form className="task-form" onSubmit={handleSubmit}>
+          {isRecurringInstance && (
+            <div className="edit-scope-picker">
+              <span className="edit-scope-label">Essa tarefa se repete. Alterar:</span>
+              <div className="edit-scope-options">
+                <button
+                  type="button"
+                  className={`edit-scope-option${editScope === 'single' ? ' is-active' : ''}`}
+                  onClick={() => setEditScope('single')}
+                >
+                  Somente este dia ({formatShortDate(task.date)})
+                </button>
+                <button
+                  type="button"
+                  className={`edit-scope-option${editScope === 'series' ? ' is-active' : ''}`}
+                  onClick={() => setEditScope('series')}
+                >
+                  Toda a serie
+                </button>
+              </div>
+            </div>
+          )}
+
           <label className="field">
             <span>Titulo</span>
             <input
@@ -225,37 +262,41 @@ export default function TaskModal({
                 </div>
               )}
 
-              <label className="field toggle-field">
-                <span>Repetir em dias da semana</span>
-                <input
-                  type="checkbox"
-                  checked={form.recurrenceEnabled}
-                  onChange={(e) => update({ recurrenceEnabled: e.target.checked })}
-                />
-              </label>
-
-              {form.recurrenceEnabled && (
+              {!editingSingleOccurrence && (
                 <>
-                  <div className="weekday-picker">
-                    {WEEKDAY_LABELS.map((label, idx) => (
-                      <button
-                        type="button"
-                        key={label}
-                        className={`weekday-chip${form.daysOfWeek.includes(idx) ? ' is-active' : ''}`}
-                        onClick={() => toggleDay(idx)}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <label className="field">
-                    <span>Repetir ate (opcional)</span>
+                  <label className="field toggle-field">
+                    <span>Repetir em dias da semana</span>
                     <input
-                      type="date"
-                      value={form.recurrenceEndDate}
-                      onChange={(e) => update({ recurrenceEndDate: e.target.value })}
+                      type="checkbox"
+                      checked={form.recurrenceEnabled}
+                      onChange={(e) => update({ recurrenceEnabled: e.target.checked })}
                     />
                   </label>
+
+                  {form.recurrenceEnabled && (
+                    <>
+                      <div className="weekday-picker">
+                        {WEEKDAY_LABELS.map((label, idx) => (
+                          <button
+                            type="button"
+                            key={label}
+                            className={`weekday-chip${form.daysOfWeek.includes(idx) ? ' is-active' : ''}`}
+                            onClick={() => toggleDay(idx)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <label className="field">
+                        <span>Repetir ate (opcional)</span>
+                        <input
+                          type="date"
+                          value={form.recurrenceEndDate}
+                          onChange={(e) => update({ recurrenceEndDate: e.target.value })}
+                        />
+                      </label>
+                    </>
+                  )}
                 </>
               )}
             </>
@@ -263,8 +304,12 @@ export default function TaskModal({
 
           <div className="modal-actions">
             {isEditing && (
-              <button type="button" className="danger-btn" onClick={() => onDelete(task)}>
-                Excluir
+              <button
+                type="button"
+                className="danger-btn"
+                onClick={() => onDelete(task, editingSingleOccurrence ? 'single' : 'series')}
+              >
+                {editingSingleOccurrence ? 'Excluir este dia' : 'Excluir'}
               </button>
             )}
             <button type="submit" className="primary-btn">
