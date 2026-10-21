@@ -18,6 +18,7 @@ function buildInitialState(task, defaultDate, forceGoal, defaultStartTime, defau
       endTime: task.endTime || '10:00',
       allDay: !!task.allDay,
       isGoal: !!task.isGoal,
+      isTodo: !!task.isTodo,
       category: task.category || '',
       newCategoryMode: false,
       newCategoryName: '',
@@ -36,6 +37,7 @@ function buildInitialState(task, defaultDate, forceGoal, defaultStartTime, defau
     endTime: defaultEndTime || '10:00',
     allDay: false,
     isGoal: !!forceGoal,
+    isTodo: false, // todos are only created through the quick-add input, never from here
     category: '',
     newCategoryMode: false,
     newCategoryName: '',
@@ -88,14 +90,16 @@ export default function TaskModal({
     const selected = categories.find((c) => c.name === form.category);
     const categoryColor = form.newCategoryMode ? form.newCategoryColor : selected?.color || DEFAULT_COLOR;
 
+    const noTime = form.allDay || form.isGoal || form.isTodo;
     const payload = {
       title: form.title.trim(),
       description: form.description.trim(),
       date: form.date,
-      allDay: form.allDay || form.isGoal,
-      startTime: form.allDay || form.isGoal ? null : form.startTime,
-      endTime: form.allDay || form.isGoal ? null : form.endTime,
+      allDay: noTime,
+      startTime: noTime ? null : form.startTime,
+      endTime: noTime ? null : form.endTime,
       isGoal: form.isGoal,
+      isTodo: form.isTodo,
       category: categoryName,
       categoryColor,
       recurrence: {
@@ -117,7 +121,7 @@ export default function TaskModal({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{isEditing ? 'Editar' : 'Nova'} {form.isGoal ? 'meta' : 'tarefa'}</h2>
+          <h2>{form.isTodo ? 'Editar ToDo' : `${isEditing ? 'Editar' : 'Nova'} ${form.isGoal ? 'meta' : 'tarefa'}`}</h2>
           <button className="icon-btn" onClick={onClose} aria-label="Fechar">
             ✕
           </button>
@@ -166,14 +170,16 @@ export default function TaskModal({
             />
           </label>
 
-          <label className="field toggle-field">
-            <span>E uma meta da semana (sem horario)</span>
-            <input
-              type="checkbox"
-              checked={form.isGoal}
-              onChange={(e) => update({ isGoal: e.target.checked })}
-            />
-          </label>
+          {!form.isTodo && (
+            <label className="field toggle-field">
+              <span>E uma meta da semana (sem horario)</span>
+              <input
+                type="checkbox"
+                checked={form.isGoal}
+                onChange={(e) => update({ isGoal: e.target.checked })}
+              />
+            </label>
+          )}
 
           <label className="field">
             <span>Categoria</span>
@@ -230,7 +236,7 @@ export default function TaskModal({
             />
           </label>
 
-          {!form.isGoal && (
+          {!form.isGoal && !form.isTodo && (
             <>
               <label className="field toggle-field">
                 <span>Dia inteiro / sem horario fixo</span>

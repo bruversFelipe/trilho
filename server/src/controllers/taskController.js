@@ -23,6 +23,24 @@ async function fetchOccurrences(userId, rangeStart, rangeEnd) {
   return expandTasks(tasks, rangeStart, rangeEnd);
 }
 
+// A ToDo is always a one-off, time-less note on a day - enforce that here so no
+// client payload can turn one into a timed, recurring or goal task. Works on both
+// a plain object (before create) and a Mongoose document (before save).
+function normalizeTodo(task) {
+  if (!task.isTodo) return task;
+  task.allDay = true;
+  task.startTime = null;
+  task.endTime = null;
+  task.isGoal = false;
+  task.recurrence = {
+    enabled: false,
+    daysOfWeek: [],
+    endDate: null,
+    excludedDates: task.recurrence?.excludedDates || [],
+  };
+  return task;
+}
+
 async function resolveCategory(userId, { category, categoryColor, categoryId }) {
   if (categoryId) {
     const existing = await Category.findOne({ _id: categoryId, userId });
@@ -92,24 +110,27 @@ export async function createTask(req, res) {
 
   const category = await resolveCategory(req.userId, body);
 
-  const task = await Task.create({
-    userId: req.userId,
-    title: body.title,
-    description: body.description || '',
-    date: new Date(body.date),
-    startTime: body.startTime || null,
-    endTime: body.endTime || null,
-    allDay: !!body.allDay,
-    isGoal: !!body.isGoal,
-    category: category?.name || '',
-    categoryColor: category?.color || '#6366f1',
-    categoryId: category?._id || null,
-    recurrence: {
-      enabled: !!body.recurrence?.enabled,
-      daysOfWeek: body.recurrence?.daysOfWeek || [],
-      endDate: body.recurrence?.endDate ? new Date(body.recurrence.endDate) : null,
-    },
-  });
+  const task = await Task.create(
+    normalizeTodo({
+      userId: req.userId,
+      title: body.title,
+      description: body.description || '',
+      date: new Date(body.date),
+      startTime: body.startTime || null,
+      endTime: body.endTime || null,
+      allDay: !!body.allDay,
+      isGoal: !!body.isGoal,
+      isTodo: !!body.isTodo,
+      category: category?.name || '',
+      categoryColor: category?.color || '#6366f1',
+      categoryId: category?._id || null,
+      recurrence: {
+        enabled: !!body.recurrence?.enabled,
+        daysOfWeek: body.recurrence?.daysOfWeek || [],
+        endDate: body.recurrence?.endDate ? new Date(body.recurrence.endDate) : null,
+      },
+    })
+  );
 
   res.status(201).json(task);
 }
@@ -143,6 +164,7 @@ export async function updateTask(req, res) {
     'endTime',
     'allDay',
     'isGoal',
+    'isTodo',
     'completed',
   ];
   for (const key of assignable) {
@@ -160,6 +182,7 @@ export async function updateTask(req, res) {
     };
   }
 
+  normalizeTodo(task);
   await task.save();
   res.json(task);
 }
@@ -171,20 +194,23 @@ async function detachOccurrence(req, res, seriesTask, body) {
 
   const category = await resolveCategory(req.userId, body);
 
-  const detached = await Task.create({
-    userId: req.userId,
-    title: body.title,
-    description: body.description || '',
-    date: new Date(body.date),
-    startTime: body.startTime || null,
-    endTime: body.endTime || null,
-    allDay: !!body.allDay,
-    isGoal: !!body.isGoal,
-    category: category?.name || '',
-    categoryColor: category?.color || '#6366f1',
-    categoryId: category?._id || null,
-    recurrence: { enabled: false, daysOfWeek: [], endDate: null, excludedDates: [] },
-  });
+  const detached = await Task.create(
+    normalizeTodo({
+      userId: req.userId,
+      title: body.title,
+      description: body.description || '',
+      date: new Date(body.date),
+      startTime: body.startTime || null,
+      endTime: body.endTime || null,
+      allDay: !!body.allDay,
+      isGoal: !!body.isGoal,
+      isTodo: !!body.isTodo,
+      category: category?.name || '',
+      categoryColor: category?.color || '#6366f1',
+      categoryId: category?._id || null,
+      recurrence: { enabled: false, daysOfWeek: [], endDate: null, excludedDates: [] },
+    })
+  );
 
   excludeDateFromSeries(seriesTask, body.occurrenceDate);
   await seriesTask.save();

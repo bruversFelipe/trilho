@@ -30,6 +30,16 @@ entre eles.
 - `WeekView.jsx` / `MonthView.jsx` — só renderização de um período; cada um
   chama `useTasksForRange` internamente (não recebem tasks via prop).
   `WeekView` aceita `dayCount` (1/3/7 dias, default 7).
+- Faixa do topo da semana (`.week-allday`, dentro do `WeekView`): chips "dia
+  todo" primeiro, depois ToDos (`isTodo`, ordem de `createdAt`). Limite de
+  `STRIP_LIMIT` (3) itens somando os dois, além disso "+N mais" expande só
+  aquela coluna — existe porque todas as colunas dividem a altura da linha.
+  `TodoQuickAdd.jsx` é o "+ todo" de cada coluna (input inline; Enter salva e
+  continua aberto). ToDo é editado no `TaskModal` em modo enxuto (título,
+  descrição, categoria, data) e nunca é criado pelo modal.
+- `NowIndicator.jsx` — linha vermelha da hora atual, renderizada só na coluna
+  de hoje do `WeekView`; tem o próprio relógio (30s) pra não re-renderizar a
+  grade.
 - `GoalsPanel.jsx` — recebe `weekStart` já pronto (não `focusDate`); quem
   decide qual semana mostrar é sempre o chamador. Sempre semana cheia,
   independente do `dayCount` do calendário (metas não têm "modo dia").

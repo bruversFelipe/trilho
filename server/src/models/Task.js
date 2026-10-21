@@ -12,6 +12,8 @@ const taskSchema = new mongoose.Schema(
     endTime: { type: String, default: null }, // "HH:mm"
     allDay: { type: Boolean, default: false },
     isGoal: { type: Boolean, default: false },
+    // Quick note pinned to a day (no time, no recurrence) - see normalizeTodo in taskController
+    isTodo: { type: Boolean, default: false },
 
     category: { type: String, default: '' },
     categoryColor: { type: String, default: '#6366f1' },

@@ -112,6 +112,17 @@ function App() {
     }
   }
 
+  // Quick-add from the "+ todo" input in the week view - no modal, just the title.
+  async function handleAddTodo(day, title) {
+    try {
+      await createTask({ title, date: dateKey(day), isTodo: true });
+      bump();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Erro ao salvar');
+    }
+  }
+
   async function handleDelete(task, scope) {
     const isSingleOccurrence = scope === 'single' && task.recurrence?.enabled;
     const confirmMsg = isSingleOccurrence
@@ -207,6 +218,7 @@ function App() {
                 onToggleComplete={handleToggleComplete}
                 onVisiblePeriodChange={(period) => setVisibleWeekStart(startOfWeek(period))}
                 onCreateAt={handleCreateAt}
+                onAddTodo={handleAddTodo}
               />
             )}
             {tab === 'month' && (

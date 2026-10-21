@@ -371,6 +371,103 @@
   white-space: nowrap;
 }
 
+/* ToDos share the all-day strip with .chip but read as plain notes: no fill, square
+   checkbox always visible. --todo-color is only set inline when it has a category. */
+.todo-item {
+  --todo-color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  padding: 1px 3px;
+  min-width: 0;
+}
+
+.todo-check {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  margin: 0;
+  border-radius: 3px;
+  border: 1.5px solid var(--todo-color);
+  color: white;
+  font-size: 7px;
+  line-height: 1;
+}
+
+.todo-item.is-done .todo-check {
+  background: var(--todo-color);
+}
+
+.todo-body {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  color: var(--text);
+}
+
+.todo-item.is-done .todo-body {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.todo-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strip-more,
+.todo-add {
+  padding: 1px 3px;
+  font-size: 9px;
+  text-align: left;
+  color: var(--text-dim);
+}
+
+.strip-more {
+  font-weight: 600;
+}
+
+.todo-add:hover,
+.strip-more:hover {
+  color: var(--text);
+}
+
+/* Mouse devices: "+ todo" only shows while hovering the strip. Uses opacity, not
+   display, so its space stays reserved and the strip doesn't jump on hover.
+   Touch devices have no hover, so there it's always visible. */
+@media (hover: hover) {
+  .todo-add {
+    opacity: 0;
+  }
+
+  .week-allday:hover .todo-add,
+  .todo-add:focus-visible {
+    opacity: 1;
+  }
+}
+
+.todo-add-input {
+  width: 100%;
+  min-width: 0;
+  font-size: 10px;
+  padding: 1px 3px;
+  border: 1px solid var(--text);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--text);
+}
+
 .notes-icon {
   flex-shrink: 0;
   color: currentColor;

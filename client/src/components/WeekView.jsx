@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   addDays,
   dateKey,
@@ -12,10 +12,14 @@ import { useTasksForRange } from '../hooks/useTasksForRange.js';
 import { layoutDayEvents } from '../utils/layout.js';
 import NotesIcon from './NotesIcon.jsx';
 import NowIndicator from './NowIndicator.jsx';
+import TodoQuickAdd from './TodoQuickAdd.jsx';
 
 const ROW_HEIGHT = 52; // px per hour
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const SNAP_MINUTES = 30;
+// Max all-day chips + todos shown per column before "+N mais", so one busy day
+// doesn't stretch the whole strip (every column shares the row height).
+const STRIP_LIMIT = 3;
 
 function minutesToTime(totalMinutes) {
   const h = Math.floor(totalMinutes / 60);
@@ -23,27 +27,51 @@ function minutesToTime(totalMinutes) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-export default function WeekView({ weekStart, dayCount = 7, refreshKey, onEditTask, onToggleComplete, onCreateAt }) {
+export default function WeekView({
+  weekStart,
+  dayCount = 7,
+  refreshKey,
+  onEditTask,
+  onToggleComplete,
+  onCreateAt,
+  onAddTodo,
+}) {
   const weekEnd = addDays(weekStart, dayCount - 1);
   const { tasks } = useTasksForRange(weekStart, weekEnd, refreshKey);
   const days = useMemo(() => getDays(weekStart, dayCount), [weekStart, dayCount]);
+  const [expandedDays, setExpandedDays] = useState({}); // dateKey -> true when "+N mais" was opened
 
   const byDay = useMemo(() => {
     const map = {};
-    for (const day of days) map[dateKey(day)] = { timed: [], allDay: [] };
+    for (const day of days) map[dateKey(day)] = { timed: [], allDay: [], todos: [] };
 
     for (const task of tasks) {
       if (task.isGoal) continue;
       const key = dateKey(task.date);
       if (!map[key]) continue;
-      if (task.allDay || !task.startTime) {
+      if (task.isTodo) {
+        map[key].todos.push(task);
+      } else if (task.allDay || !task.startTime) {
         map[key].allDay.push(task);
       } else {
         map[key].timed.push(task);
       }
     }
+    for (const key of Object.keys(map)) {
+      map[key].todos.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    }
     return map;
   }, [tasks, days]);
+
+  function setDayExpanded(key, expanded) {
+    setExpandedDays((prev) => ({ ...prev, [key]: expanded }));
+  }
+
+  function handleAddTodo(day, title) {
+    // Keep what was just typed visible even if the column is past STRIP_LIMIT.
+    setDayExpanded(dateKey(day), true);
+    onAddTodo(day, title);
+  }
 
   function handleSlotClick(e, day, hour) {
     if (!onCreateAt) return;
@@ -75,10 +103,18 @@ export default function WeekView({ weekStart, dayCount = 7, refreshKey, onEditTa
           <div className="time-gutter-spacer" />
           {days.map((day) => {
             const key = dateKey(day);
-            const items = byDay[key]?.allDay || [];
+            const chips = byDay[key]?.allDay || [];
+            const todos = byDay[key]?.todos || [];
+            const total = chips.length + todos.length;
+            const expanded = !!expandedDays[key];
+            // The limit is shared: all-day chips first, todos fill whatever room is left.
+            const visibleChips = expanded ? chips : chips.slice(0, STRIP_LIMIT);
+            const visibleTodos = expanded ? todos : todos.slice(0, Math.max(0, STRIP_LIMIT - chips.length));
+            const hiddenCount = total - visibleChips.length - visibleTodos.length;
+
             return (
               <div key={key} className="week-allday-cell">
-                {items.map((task) => (
+                {visibleChips.map((task) => (
                   <div
                     key={task.occurrenceId}
                     className={`chip${task.completed ? ' is-done' : ''}`}
@@ -113,6 +149,45 @@ export default function WeekView({ weekStart, dayCount = 7, refreshKey, onEditTa
                     </button>
                   </div>
                 ))}
+
+                {visibleTodos.map((task) => (
+                  <div
+                    key={task.occurrenceId}
+                    className={`todo-item${task.completed ? ' is-done' : ''}`}
+                    // No category = neutral gray, not the model's default indigo
+                    style={task.category ? { '--todo-color': task.categoryColor } : undefined}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      onToggleComplete(task);
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="todo-check"
+                      onClick={() => onToggleComplete(task)}
+                      aria-label={task.completed ? 'Marcar como nao concluido' : 'Marcar como concluido'}
+                    >
+                      {task.completed ? '✓' : ''}
+                    </button>
+                    <button type="button" className="todo-body" onClick={() => onEditTask(task)} title={task.title}>
+                      <span className="todo-title">{task.title}</span>
+                      {task.description && <NotesIcon className="notes-icon" />}
+                    </button>
+                  </div>
+                ))}
+
+                {hiddenCount > 0 && (
+                  <button type="button" className="strip-more" onClick={() => setDayExpanded(key, true)}>
+                    +{hiddenCount} mais
+                  </button>
+                )}
+                {expanded && total > STRIP_LIMIT && (
+                  <button type="button" className="strip-more" onClick={() => setDayExpanded(key, false)}>
+                    mostrar menos
+                  </button>
+                )}
+
+                {onAddTodo && <TodoQuickAdd onAdd={(title) => handleAddTodo(day, title)} />}
               </div>
             );
           })}

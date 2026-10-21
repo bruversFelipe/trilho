@@ -58,6 +58,15 @@ front).
 `isGoal: true` — decisão explícita do usuário: se não concluída, não rola pra
 semana seguinte automaticamente. Não "consertar" isso sem confirmar antes.
 
+## ToDos são anotações presas num dia, sem "atrasado"
+
+`isTodo: true` — anotação rápida criada pelo "+ todo" da faixa do topo da
+semana (estilo Asana). Sempre `allDay`, sem horário, sem recorrência, nunca
+meta (o servidor força isso em `normalizeTodo`, independente do payload).
+Decisão explícita do usuário: **não rola pro dia seguinte e não tem destaque
+de atrasado** — se ficou pra trás, a pessoa troca a data no modal. Não
+adicionar rollover/aviso de atrasado sem confirmar antes.
+
 ## Infra e produção
 
 - **App está em produção de verdade**: cliente na Vercel (`trilho.me`), API

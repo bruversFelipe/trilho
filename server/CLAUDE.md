@@ -47,6 +47,13 @@ memória por `utils/recurrence.js` (`expandTasks`) toda vez que
   preservar esse array — nunca sobrescrever `task.recurrence` inteiro sem
   copiar `excludedDates` primeiro.
 
+## ToDos (implementação)
+
+`normalizeTodo` em `taskController.js` roda em `createTask`, `updateTask` e
+`detachOccurrence`: se `isTodo`, força `allDay: true`, horários `null`,
+`isGoal: false` e recorrência desligada (preservando `excludedDates`). Qualquer
+novo caminho que crie/salve `Task` precisa passar por ele também.
+
 ## Autenticação
 
 JWT sem expiração, bcrypt pra senha — detalhes do contrato (payload, fluxo de

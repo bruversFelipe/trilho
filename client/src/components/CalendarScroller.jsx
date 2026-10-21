@@ -43,6 +43,7 @@ export default function CalendarScroller({
   onSelectDay,
   onVisiblePeriodChange,
   onCreateAt,
+  onAddTodo,
 }) {
   // Memoized so effects keyed on these (the intersection observer below) don't tear
   // down and rebuild on every unrelated re-render - only when mode/dayCount actually change.
@@ -197,6 +198,7 @@ export default function CalendarScroller({
               onToggleComplete={onToggleComplete}
               onSelectDay={onSelectDay}
               onCreateAt={onCreateAt}
+              onAddTodo={onAddTodo}
             />
           </div>
         );
