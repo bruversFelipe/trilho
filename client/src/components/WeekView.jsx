@@ -11,6 +11,7 @@ import {
 import { useTasksForRange } from '../hooks/useTasksForRange.js';
 import { layoutDayEvents } from '../utils/layout.js';
 import NotesIcon from './NotesIcon.jsx';
+import NowIndicator from './NowIndicator.jsx';
 
 const ROW_HEIGHT = 52; // px per hour
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -206,6 +207,8 @@ export default function WeekView({ weekStart, dayCount = 7, refreshKey, onEditTa
                     </div>
                   );
                 })}
+
+                {isToday(day) && <NowIndicator rowHeight={ROW_HEIGHT} />}
               </div>
             );
           })}

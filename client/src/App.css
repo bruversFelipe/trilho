@@ -428,6 +428,30 @@
   opacity: 0.55;
 }
 
+/* Current-time line in today's column (NowIndicator). Sits above task blocks but
+   ignores the mouse so clicking the slot/task underneath still works. */
+.now-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  margin-top: -1px;
+  background: #ea4335;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.now-indicator::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: -5px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ea4335;
+}
+
 /* Hidden until you hover the block; stays visible once checked so there's
    always a way to un-check it again. Toggling never changes anything else
    about the task block - just this circle and the block's opacity. */
