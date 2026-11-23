@@ -9,6 +9,10 @@ import {
 } from '../utils/drag.js';
 
 const MOUSE_SLOP_PX = 4; // a mouse press only becomes a drag past this, so a click still opens the modal
+// Touch/pen: hold still this long to pick a task up; moving more than TOUCH_SLOP_PX
+// before that means the finger is scrolling, so the gesture is dropped.
+const LONG_PRESS_MS = 450;
+const TOUCH_SLOP_PX = 8;
 const LANDING_MS = 150;
 
 function prefersReducedMotion() {
@@ -42,6 +46,8 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
   const [dragState, setDragState] = useState(null);
   const gestureRef = useRef(null); // live pointer gesture, mutated every frame
   const suppressClickRef = useRef(false);
+  const lastPointerTypeRef = useRef(null);
+  const touchDragActiveRef = useRef(false); // read by the permanent touchmove blocker below
   const flipRef = useRef(null); // { occurrenceId, fromRect }: animate the landing after the next render
   const pendingRef = useRef(pending);
   const latestRef = useRef(null); // latest props, read by the window listeners
@@ -169,6 +175,10 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
 
   function activate(g) {
     g.active = true;
+    if (g.pointerType !== 'mouse') {
+      touchDragActiveRef.current = true;
+      navigator.vibrate?.(10);
+    }
     g.columns = readColumns(g.kind);
     g.target = { dayIndex: g.dayIndex, startMin: g.kind === 'timed' ? g.span.start : null };
     suppressClickRef.current = true;
@@ -183,8 +193,12 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
     if (!g || e.pointerId !== g.pointerId) return;
     g.lastX = e.clientX;
     g.lastY = e.clientY;
-    if (!g.active && Math.hypot(g.lastX - g.startX, g.lastY - g.startY) > MOUSE_SLOP_PX) {
-      activate(g);
+    if (g.active) return;
+    const moved = Math.hypot(g.lastX - g.startX, g.lastY - g.startY);
+    if (g.pointerType === 'mouse') {
+      if (moved > MOUSE_SLOP_PX) activate(g);
+    } else if (moved > TOUCH_SLOP_PX) {
+      finish(false); // the finger is scrolling, not holding - let the page scroll
     }
   }
 
@@ -194,6 +208,7 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
     gestureRef.current = null;
     g.detach();
     if (!g.active) return; // just a click - let it through
+    touchDragActiveRef.current = false;
 
     document.body.classList.remove('is-task-dragging');
     setDragState(null);
@@ -239,12 +254,28 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
       if (!g) return;
       gestureRef.current = null;
       g.detach();
+      touchDragActiveRef.current = false;
       if (g.active) document.body.classList.remove('is-task-dragging');
     },
     []
   );
 
+  // Once a long press picked a task up, the finger moving must drag it, not scroll the
+  // calendar. Registered once, non-passive, for the component's lifetime: adding it only
+  // when the drag starts isn't reliable on iOS, which decides how to treat the touch
+  // based on the listeners present when it began.
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return undefined;
+    function blockScroll(e) {
+      if (touchDragActiveRef.current) e.preventDefault();
+    }
+    el.addEventListener('touchmove', blockScroll, { passive: false });
+    return () => el.removeEventListener('touchmove', blockScroll);
+  }, [rootRef]);
+
   function handlePointerDown(e, task, kind, dayIndex) {
+    lastPointerTypeRef.current = e.pointerType;
     if (!latestRef.current.onMoveTask || gestureRef.current) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (e.target.closest('[data-drag-ignore]')) return;
@@ -280,12 +311,18 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
     window.addEventListener('pointercancel', handlePointerCancel);
     window.addEventListener('keydown', handleKeyDown, true);
     const gesture = gestureRef.current;
+    if (e.pointerType !== 'mouse') {
+      gesture.pressTimer = setTimeout(() => {
+        if (gestureRef.current === gesture && !gesture.active) activate(gesture);
+      }, LONG_PRESS_MS);
+    }
     gesture.detach = () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerCancel);
       window.removeEventListener('keydown', handleKeyDown, true);
       if (gesture.frame != null) cancelAnimationFrame(gesture.frame);
+      clearTimeout(gesture.pressTimer);
     };
   }
 
@@ -302,7 +339,15 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
       'data-occurrence-id': task.occurrenceId,
       onPointerDown: (e) => handlePointerDown(e, task, kind, dayIndex),
       onClickCapture: handleClickCapture,
-      onContextMenu,
+      // On touch screens a long press fires contextmenu (Android) - that press is a
+      // drag now, so it must not also toggle completion. Mouse right-click still does.
+      onContextMenu: (e) => {
+        if (lastPointerTypeRef.current && lastPointerTypeRef.current !== 'mouse') {
+          e.preventDefault();
+          return;
+        }
+        onContextMenu?.(e);
+      },
     };
   }
 

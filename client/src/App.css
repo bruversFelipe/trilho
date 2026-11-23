@@ -527,9 +527,21 @@
 
 /* ---- Drag and drop (useTaskDrag) ---- */
 /* Text selection would otherwise start while you press-and-drag a block. */
-.task-block {
+.task-block,
+.chip,
+.todo-item {
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none; /* iOS: a long press picks the task up, no callout menu */
+}
+
+/* Touch screens have no hover, and a long press is now "drag", not "complete" -
+   so the complete circle is always shown there. Desktop keeps it hover-only. */
+@media (hover: none) {
+  .task-block .task-check,
+  .chip .chip-check {
+    display: flex;
+  }
 }
 
 /* Lifted while it follows the pointer; the translate itself is an inline transform. */
@@ -540,12 +552,6 @@
   opacity: 0.9; /* lets the dashed drop preview underneath show through */
   will-change: transform;
   cursor: grabbing;
-}
-
-.chip,
-.todo-item {
-  user-select: none;
-  -webkit-user-select: none;
 }
 
 .chip.is-dragging,
