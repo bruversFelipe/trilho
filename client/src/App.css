@@ -525,6 +525,59 @@
   opacity: 0.55;
 }
 
+/* ---- Drag and drop (useTaskDrag) ---- */
+/* Text selection would otherwise start while you press-and-drag a block. */
+.task-block {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Lifted while it follows the pointer; the translate itself is an inline transform. */
+.task-block.is-dragging {
+  z-index: 10;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  scale: 1.02;
+  opacity: 0.9; /* lets the dashed drop preview underneath show through */
+  will-change: transform;
+  cursor: grabbing;
+}
+
+/* Faded stand-in left where the dragged block came from. */
+.drag-origin {
+  position: absolute;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--chip-color) 10%, white);
+  pointer-events: none;
+}
+
+/* Dashed outline of where the task will land, snapping in 15 min steps. */
+.drop-preview {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border: 1.5px dashed color-mix(in srgb, var(--chip-color) 70%, black);
+  border-radius: 5px;
+  z-index: 3;
+  pointer-events: none;
+  transition: top 80ms ease-out;
+}
+
+body.is-task-dragging {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drop-preview {
+    transition: none;
+  }
+
+  .task-block.is-dragging {
+    scale: none;
+  }
+}
+
 /* Current-time line in today's column (NowIndicator). Sits above task blocks but
    ignores the mouse so clicking the slot/task underneath still works. */
 .now-indicator {

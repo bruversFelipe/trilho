@@ -205,6 +205,8 @@ async function detachOccurrence(req, res, seriesTask, body) {
       allDay: !!body.allDay,
       isGoal: !!body.isGoal,
       isTodo: !!body.isTodo,
+      // Keep a done occurrence done when it's detached (e.g. dragged to another day)
+      completed: !!body.completed,
       category: category?.name || '',
       categoryColor: category?.color || '#6366f1',
       categoryId: category?._id || null,

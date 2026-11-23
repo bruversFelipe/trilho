@@ -123,6 +123,42 @@ function App() {
     }
   }
 
+  // Drag-and-drop in the week view. `patch` is { date, startTime?, endTime? } from
+  // buildMovePatch. A recurring occurrence moves alone (scope 'single'): the server
+  // builds the detached task from the body, so it needs every field, not just the patch.
+  // Resolves with the saved task (WeekView uses its _id to keep keyboard focus on it);
+  // rejects on failure so WeekView can put the block back where it was.
+  async function handleMoveTask(task, patch) {
+    const payload = task.recurrence?.enabled
+      ? {
+          title: task.title,
+          description: task.description,
+          date: patch.date,
+          allDay: task.allDay,
+          startTime: patch.startTime !== undefined ? patch.startTime : task.startTime,
+          endTime: patch.endTime !== undefined ? patch.endTime : task.endTime,
+          isGoal: task.isGoal,
+          isTodo: task.isTodo,
+          category: task.category,
+          categoryId: task.categoryId,
+          categoryColor: task.categoryColor,
+          completed: task.completed,
+          scope: 'single',
+          occurrenceDate: dateKey(task.date),
+        }
+      : patch;
+
+    try {
+      const saved = await updateTask(task._id, payload);
+      bump();
+      return saved;
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Erro ao mover');
+      throw err;
+    }
+  }
+
   async function handleDelete(task, scope) {
     const isSingleOccurrence = scope === 'single' && task.recurrence?.enabled;
     const confirmMsg = isSingleOccurrence
@@ -219,6 +255,7 @@ function App() {
                 onVisiblePeriodChange={(period) => setVisibleWeekStart(startOfWeek(period))}
                 onCreateAt={handleCreateAt}
                 onAddTodo={handleAddTodo}
+                onMoveTask={handleMoveTask}
               />
             )}
             {tab === 'month' && (
