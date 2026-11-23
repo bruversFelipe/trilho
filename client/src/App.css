@@ -542,6 +542,34 @@
   cursor: grabbing;
 }
 
+.chip,
+.todo-item {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.chip.is-dragging,
+.todo-item.is-dragging {
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  background-color: var(--surface);
+  will-change: transform;
+  cursor: grabbing;
+}
+
+/* .chip has its own tinted background - keep it while lifted */
+.chip.is-dragging {
+  background: color-mix(in srgb, var(--chip-color) 18%, white);
+}
+
+/* The all-day/ToDo column a strip item will be dropped into. */
+.week-allday-cell.is-drop-target {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  outline: 1.5px dashed var(--text-dim);
+  border-radius: 4px;
+}
+
 /* Faded stand-in left where the dragged block came from. */
 .drag-origin {
   position: absolute;

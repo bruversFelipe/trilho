@@ -11,6 +11,7 @@ import {
 } from '../utils/date.js';
 import { useTasksForRange } from '../hooks/useTasksForRange.js';
 import { useTaskDrag } from '../hooks/useTaskDrag.js';
+import { dragKind } from '../utils/drag.js';
 import { layoutDayEvents } from '../utils/layout.js';
 import NotesIcon from './NotesIcon.jsx';
 import NowIndicator from './NowIndicator.jsx';
@@ -52,6 +53,14 @@ export default function WeekView({
   const rootRef = useRef(null);
   const headerRef = useRef(null);
   const gridRef = useRef(null);
+
+  // An all-day chip/ToDo dropped on a column already past STRIP_LIMIT would land
+  // hidden behind "+N mais" - open that column so you see where it went.
+  function handleMoveTask(task, patch) {
+    if (dragKind(task) === 'strip') setDayExpanded(patch.date, true);
+    return onMoveTask(task, patch);
+  }
+
   const { displayTasks, dragState, getBlockProps } = useTaskDrag({
     days,
     rowHeight: ROW_HEIGHT,
@@ -59,7 +68,7 @@ export default function WeekView({
     rootRef,
     gridRef,
     headerRef,
-    onMoveTask,
+    onMoveTask: onMoveTask ? handleMoveTask : undefined,
   });
   const pointerDragId = dragState?.source === 'pointer' ? dragState.task.occurrenceId : null;
 
@@ -123,7 +132,7 @@ export default function WeekView({
 
         <div className="week-allday">
           <div className="time-gutter-spacer" />
-          {days.map((day) => {
+          {days.map((day, dayIndex) => {
             const key = dateKey(day);
             const chips = byDay[key]?.allDay || [];
             const todos = byDay[key]?.todos || [];
@@ -135,19 +144,30 @@ export default function WeekView({
             const hiddenCount = total - visibleChips.length - visibleTodos.length;
 
             return (
-              <div key={key} className="week-allday-cell">
+              <div
+                key={key}
+                className={`week-allday-cell${
+                  dragState?.kind === 'strip' && dragState.dayIndex === dayIndex ? ' is-drop-target' : ''
+                }`}
+                data-strip-cell={dayIndex}
+              >
                 {visibleChips.map((task) => (
                   <div
                     key={task.occurrenceId}
-                    className={`chip${task.completed ? ' is-done' : ''}`}
+                    className={`chip${task.completed ? ' is-done' : ''}${
+                      pointerDragId === task.occurrenceId ? ' is-dragging' : ''
+                    }`}
                     style={{ '--chip-color': task.categoryColor }}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      onToggleComplete(task);
-                    }}
+                    {...getBlockProps(task, 'strip', dayIndex, {
+                      onContextMenu: (e) => {
+                        e.preventDefault();
+                        onToggleComplete(task);
+                      },
+                    })}
                   >
                     <button
                       type="button"
+                      data-drag-ignore
                       className="chip-check"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -175,16 +195,21 @@ export default function WeekView({
                 {visibleTodos.map((task) => (
                   <div
                     key={task.occurrenceId}
-                    className={`todo-item${task.completed ? ' is-done' : ''}`}
+                    className={`todo-item${task.completed ? ' is-done' : ''}${
+                      pointerDragId === task.occurrenceId ? ' is-dragging' : ''
+                    }`}
                     // No category = neutral gray, not the model's default indigo
                     style={task.category ? { '--todo-color': task.categoryColor } : undefined}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      onToggleComplete(task);
-                    }}
+                    {...getBlockProps(task, 'strip', dayIndex, {
+                      onContextMenu: (e) => {
+                        e.preventDefault();
+                        onToggleComplete(task);
+                      },
+                    })}
                   >
                     <button
                       type="button"
+                      data-drag-ignore
                       className="todo-check"
                       onClick={() => onToggleComplete(task)}
                       aria-label={task.completed ? 'Marcar como nao concluido' : 'Marcar como concluido'}
