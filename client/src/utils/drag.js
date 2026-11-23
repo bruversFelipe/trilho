@@ -35,11 +35,19 @@ export function snapAndClampStart(rawStart, duration) {
   return clamp(snapped, 0, LAST_MINUTE - duration);
 }
 
-/** Index of the column under clientX; outside the columns it sticks to the nearest end. */
+/** Start for a pointer drag: snapped, except that within half a step of the task's own
+ * (possibly off-grid, e.g. 10:07) start it keeps that start - so picking a task up
+ * and putting it back, or moving it only sideways, doesn't nudge its time. */
+export function dragStartMin(rawStart, span) {
+  if (Math.abs(rawStart - span.start) < DRAG_SNAP_MINUTES / 2) return span.start;
+  return snapAndClampStart(rawStart, span.duration);
+}
+
+/** Index of the column under clientX; outside the columns it sticks to the nearest end.
+ * A gap between columns (the top strip's grid gap) counts as the column after it. */
 export function pickDayIndex(clientX, columns) {
-  const index = columns.findIndex((col) => clientX >= col.left && clientX < col.right);
-  if (index !== -1) return index;
-  return clientX < columns[0].left ? 0 : columns.length - 1;
+  const index = columns.findIndex((col) => clientX < col.right);
+  return index === -1 ? columns.length - 1 : index;
 }
 
 /** Keyboard move: arrows up/down = -/+15 min (timed only), left/right = -/+1 visible
@@ -73,11 +81,17 @@ export function buildMovePatch(task, { date, startMin }) {
 
   const { start, duration, hasEnd } = taskSpan(task);
   if (sameDay && startMin === start) return null;
-  return {
-    date: newDate,
-    startTime: minutesToTime(startMin),
-    endTime: hasEnd ? minutesToTime(startMin + duration) : null,
-  };
+
+  let endTime = null;
+  if (hasEnd) {
+    const end = timeToMinutes(task.endTime);
+    // An end before the start (e.g. 23:00-00:30, past midnight): shift it by the same
+    // amount, wrapping around the day, instead of collapsing it onto the new start.
+    endTime = end < start
+      ? minutesToTime((((end + startMin - start) % 1440) + 1440) % 1440)
+      : minutesToTime(startMin + duration);
+  }
+  return { date: newDate, startTime: minutesToTime(startMin), endTime };
 }
 
 /** Optimistic view: tasks with a pending move drawn at their new day/time until the

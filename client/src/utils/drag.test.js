@@ -8,6 +8,7 @@ import {
   describeDrop,
   describeTarget,
   dragKind,
+  dragStartMin,
   pickDayIndex,
   snapAndClampStart,
   stepKeyboardTarget,
@@ -53,6 +54,41 @@ test('pickDayIndex picks the column under the pointer, clamped to the visible on
   assert.equal(pickDayIndex(10, cols), 0);
   assert.equal(pickDayIndex(999, cols), 2);
   assert.equal(pickDayIndex(999, [cols[0]]), 0); // "Dia" density
+});
+
+test('pickDayIndex assigns the gap between strip cells to a neighbour, not the last day', () => {
+  const gapped = [
+    { left: 44, right: 100 },
+    { left: 102, right: 158 },
+    { left: 160, right: 216 },
+  ];
+  assert.equal(pickDayIndex(101, gapped), 1);
+  assert.equal(pickDayIndex(159, gapped), 2);
+  assert.equal(pickDayIndex(50, gapped), 0);
+});
+
+test('dragStartMin keeps an off-grid start when the pointer is back near it', () => {
+  const span = { start: 607, duration: 60, hasEnd: true }; // 10:07
+  assert.equal(dragStartMin(607, span), 607);
+  assert.equal(dragStartMin(611, span), 607);
+  assert.equal(dragStartMin(601, span), 607);
+  assert.equal(dragStartMin(620, span), 615);
+  assert.equal(dragStartMin(592, span), 585);
+  assert.equal(buildMovePatch({ ...timed, startTime: '10:07', endTime: '11:07' }, { date: MON, startMin: 607 }), null);
+});
+
+test('buildMovePatch shifts the end of an overnight task instead of dropping it', () => {
+  const overnight = { ...timed, startTime: '23:00', endTime: '00:30' };
+  assert.deepEqual(buildMovePatch(overnight, { date: MON, startMin: 22 * 60 }), {
+    date: '2026-11-23',
+    startTime: '22:00',
+    endTime: '23:30',
+  });
+  assert.deepEqual(buildMovePatch(overnight, { date: MON, startMin: 23 * 60 + 30 }), {
+    date: '2026-11-23',
+    startTime: '23:30',
+    endTime: '01:00',
+  });
 });
 
 test('stepKeyboardTarget moves 15 min / 1 day and ignores other keys', () => {

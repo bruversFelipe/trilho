@@ -5,9 +5,9 @@ import {
   buildMovePatch,
   describeDrop,
   describeTarget,
+  dragStartMin,
   MOVE_CANCELLED,
   pickDayIndex,
-  snapAndClampStart,
   stepKeyboardTarget,
   taskSpan,
 } from '../utils/drag.js';
@@ -23,15 +23,19 @@ function prefersReducedMotion() {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 }
 
-/** Slides `el` from its current transform back to none (cancel / drop on the same spot). */
-function animateBack(el) {
-  if (prefersReducedMotion()) {
+/** Animates `el`'s transform to none, then drops the inline transition. Cleared on a
+ * timer rather than transitionend: no transition runs at all when the transform was
+ * already none (released before the first frame), and a leftover inline transition
+ * would make the next drag of that block lag behind the pointer. */
+function slideHome(el) {
+  if (prefersReducedMotion() || !el.style.transform) {
+    el.style.transition = '';
     el.style.transform = '';
     return;
   }
   el.style.transition = `transform ${LANDING_MS}ms ease-out`;
   el.style.transform = '';
-  el.addEventListener('transitionend', () => (el.style.transition = ''), { once: true });
+  setTimeout(() => (el.style.transition = ''), LANDING_MS + 50);
 }
 
 /**
@@ -104,9 +108,7 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
     }
     el.style.transform = `translate(${dx}px, ${dy}px)`;
     el.getBoundingClientRect(); // flush, so the transition starts from the dropped position
-    el.style.transition = `transform ${LANDING_MS}ms ease-out`;
-    el.style.transform = '';
-    el.addEventListener('transitionend', () => (el.style.transition = ''), { once: true });
+    slideHome(el);
   });
 
   // Keyboard moves keep focus on the task: it may have been remounted in another
@@ -160,8 +162,7 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
 
   function computeTarget(g) {
     const dayIndex = pickDayIndex(g.lastX, g.columns);
-    const startMin =
-      g.kind === 'timed' ? snapAndClampStart(pointerMinutes(g.lastY) - g.grabOffsetMin, g.span.duration) : null;
+    const startMin = g.kind === 'timed' ? dragStartMin(pointerMinutes(g.lastY) - g.grabOffsetMin, g.span) : null;
     return { dayIndex, startMin };
   }
 
@@ -202,6 +203,12 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
 
   function activate(g) {
     g.active = true;
+    g.el.style.transition = '';
+    if (keyboardRef.current) {
+      // A pointer drag replaces an unfinished arrow-key move (otherwise a later Enter
+      // would still commit that stale keyboard target).
+      keyboardRef.current = null;
+    }
     if (g.pointerType !== 'mouse') {
       touchDragActiveRef.current = true;
       navigator.vibrate?.(10);
@@ -218,6 +225,10 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
   function handlePointerMove(e) {
     const g = gestureRef.current;
     if (!g || e.pointerId !== g.pointerId) return;
+    if (g.pointerType === 'mouse' && e.buttons === 0) {
+      finish(false); // the button was released somewhere we never got a pointerup (e.g. alt-tab)
+      return;
+    }
     g.lastX = e.clientX;
     g.lastY = e.clientY;
     if (g.active) return;
@@ -250,7 +261,7 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
       ? buildMovePatch(g.task, { date: currentDays[g.target.dayIndex], startMin: g.target.startMin })
       : null;
     if (!patch) {
-      animateBack(g.el);
+      slideHome(g.el);
       return;
     }
     // Keep the transform until the re-render; the FLIP effect takes it from there.
@@ -354,11 +365,21 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
     };
   }
 
-  function handleClickCapture(e) {
-    if (!suppressClickRef.current) return;
-    e.preventDefault();
-    e.stopPropagation();
-    suppressClickRef.current = false;
+  function handleClickCapture(e, task) {
+    if (suppressClickRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      suppressClickRef.current = false;
+      return;
+    }
+    // Until the refetch lands, this item is an optimistic copy that still carries the
+    // series' _id/recurrence and its old identity: completing it or opening the modal
+    // now would act on the wrong occurrence (e.g. tick the series' own copy of that
+    // day). Covers the check button, the body and Enter on it - all are clicks here.
+    if (pendingRef.current.has(task.occurrenceId)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
   }
 
   function cancelKeyboardMove() {
@@ -441,11 +462,14 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
     return {
       'data-occurrence-id': task.occurrenceId,
       onPointerDown: (e) => handlePointerDown(e, task, kind, dayIndex),
-      onClickCapture: handleClickCapture,
+      onClickCapture: (e) => handleClickCapture(e, task),
       // On touch screens a long press fires contextmenu (Android) - that press is a
       // drag now, so it must not also toggle completion. Mouse right-click still does.
       onContextMenu: (e) => {
-        if (lastPointerTypeRef.current && lastPointerTypeRef.current !== 'mouse') {
+        if (
+          (lastPointerTypeRef.current && lastPointerTypeRef.current !== 'mouse') ||
+          pendingRef.current.has(task.occurrenceId) // same reason as handleClickCapture
+        ) {
           e.preventDefault();
           return;
         }
