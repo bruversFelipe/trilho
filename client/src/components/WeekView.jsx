@@ -5,6 +5,7 @@ import {
   formatDaysRangeLabel,
   getDays,
   isToday,
+  minutesToTime,
   timeToMinutes,
   WEEKDAY_LABELS,
 } from '../utils/date.js';
@@ -20,12 +21,6 @@ const SNAP_MINUTES = 30;
 // Max all-day chips + todos shown per column before "+N mais", so one busy day
 // doesn't stretch the whole strip (every column shares the row height).
 const STRIP_LIMIT = 3;
-
-function minutesToTime(totalMinutes) {
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
 
 export default function WeekView({
   weekStart,
