@@ -61,7 +61,7 @@ export default function WeekView({
     return onMoveTask(task, patch);
   }
 
-  const { displayTasks, dragState, getBlockProps } = useTaskDrag({
+  const { displayTasks, dragState, announcement, hintId, getBlockProps, getHandleProps } = useTaskDrag({
     days,
     rowHeight: ROW_HEIGHT,
     tasks,
@@ -118,6 +118,12 @@ export default function WeekView({
   return (
     <section className="week-block" style={{ '--day-count': dayCount }} ref={rootRef}>
       <h2 className="period-label">{formatDaysRangeLabel(weekStart, dayCount)}</h2>
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+      <span id={hintId} className="sr-only">
+        Use as setas para mover, Enter para confirmar e Esc para cancelar.
+      </span>
 
       <div className="week-sticky-header" ref={headerRef}>
         <div className="week-daybar">
@@ -180,6 +186,7 @@ export default function WeekView({
                     <button
                       type="button"
                       className="chip-body"
+                      {...getHandleProps(task, 'strip', dayIndex)}
                       onClick={(e) => {
                         e.stopPropagation();
                         onEditTask(task);
@@ -216,7 +223,13 @@ export default function WeekView({
                     >
                       {task.completed ? '✓' : ''}
                     </button>
-                    <button type="button" className="todo-body" onClick={() => onEditTask(task)} title={task.title}>
+                    <button
+                      type="button"
+                      className="todo-body"
+                      onClick={() => onEditTask(task)}
+                      title={task.title}
+                      {...getHandleProps(task, 'strip', dayIndex)}
+                    >
                       <span className="todo-title">{task.title}</span>
                       {task.description && <NotesIcon className="notes-icon" />}
                     </button>
@@ -306,7 +319,12 @@ export default function WeekView({
                       height: blockGeometry(dragState.task).height,
                       '--chip-color': dragState.task.categoryColor,
                     }}
-                  />
+                  >
+                    {/* Pointer drags show the time on the dragged block itself */}
+                    {dragState.source === 'keyboard' && (
+                      <span className="drop-preview-time">{minutesToTime(dragState.startMin)}</span>
+                    )}
+                  </div>
                 )}
 
                 {items.map((task) => {
@@ -349,6 +367,7 @@ export default function WeekView({
                       <button
                         type="button"
                         className="task-block-body"
+                        {...getHandleProps(task, 'timed', dayIndex)}
                         onClick={(e) => {
                           e.stopPropagation();
                           onEditTask(task);

@@ -51,7 +51,8 @@ inteira (`scope` omitido ou `'series'`) **precisa preservar**
 `excludedDates` ao sobrescrever `recurrence` no backend — nunca substituir o
 objeto sem copiar esse array (detalhe de implementação em
 `server/CLAUDE.md`, mas o contrato do campo `scope` é o que importa pro
-front).
+front). A avulsa criada por `scope: 'single'` respeita `completed` do body (o
+arrastar e soltar manda, pra ocorrência concluída continuar concluída).
 
 ## Metas ficam presas na semana em que foram criadas
 

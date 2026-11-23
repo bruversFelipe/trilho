@@ -1,10 +1,14 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   applyPendingMoves,
   autoScrollDelta,
   buildMovePatch,
+  describeDrop,
+  describeTarget,
+  MOVE_CANCELLED,
   pickDayIndex,
   snapAndClampStart,
+  stepKeyboardTarget,
   taskSpan,
 } from '../utils/drag.js';
 
@@ -38,12 +42,19 @@ function animateBack(el) {
  * - Drops are optimistic: `displayTasks` shows the task at its new place right away
  *   and keeps it there until the refetch that follows the save lands (or puts it
  *   back if the save fails).
+ * - Keyboard: with an item's button focused, arrows move a preview (up/down 15 min,
+ *   left/right one visible day), Enter saves, Esc or leaving the button cancels.
+ *   Each step and the result go to `announcement` (an aria-live region in WeekView).
  * `rootRef` = the WeekView section, `gridRef` = .week-grid, `headerRef` = its
  * sticky header (the visible top edge for auto-scroll).
  */
 export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRef, onMoveTask }) {
   const [pending, setPending] = useState(() => new Map()); // occurrenceId -> { patch, settled }
   const [dragState, setDragState] = useState(null);
+  const [announcement, setAnnouncement] = useState('');
+  const hintId = useId();
+  const keyboardRef = useRef(null); // { task, kind, originDayIndex, target } while moving with arrows
+  const pendingFocusRef = useRef(null); // occurrenceId whose button should get focus once it renders
   const gestureRef = useRef(null); // live pointer gesture, mutated every frame
   const suppressClickRef = useRef(false);
   const lastPointerTypeRef = useRef(null);
@@ -97,6 +108,22 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
     el.style.transform = '';
     el.addEventListener('transitionend', () => (el.style.transition = ''), { once: true });
   });
+
+  // Keyboard moves keep focus on the task: it may have been remounted in another
+  // column, and after the refetch it comes back under a new occurrenceId.
+  useLayoutEffect(() => {
+    const id = pendingFocusRef.current;
+    if (!id || !rootRef.current) return;
+    const el = rootRef.current.querySelector(`[data-drag-focus="${CSS.escape(id)}"]`);
+    if (!el) return;
+    if (document.activeElement !== el) el.focus();
+    pendingFocusRef.current = null;
+  });
+
+  function flipFrom(occurrenceId) {
+    const el = rootRef.current?.querySelector(`[data-occurrence-id="${CSS.escape(occurrenceId)}"]`);
+    if (el) flipRef.current = { occurrenceId, fromRect: el.getBoundingClientRect() };
+  }
 
   function commitMove(task, patch) {
     const id = task.occurrenceId;
@@ -228,6 +255,7 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
     }
     // Keep the transform until the re-render; the FLIP effect takes it from there.
     flipRef.current = { occurrenceId: g.task.occurrenceId, fromRect: g.el.getBoundingClientRect() };
+    setAnnouncement(describeDrop(g.task, currentDays[g.target.dayIndex], g.target.startMin));
     commitMove(g.task, patch);
   }
 
@@ -333,6 +361,81 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
     suppressClickRef.current = false;
   }
 
+  function cancelKeyboardMove() {
+    if (!keyboardRef.current) return;
+    keyboardRef.current = null;
+    setDragState(null);
+    setAnnouncement(MOVE_CANCELLED);
+  }
+
+  function commitKeyboardMove() {
+    const kb = keyboardRef.current;
+    keyboardRef.current = null;
+    setDragState(null);
+    const { days: currentDays } = latestRef.current;
+    const date = currentDays[kb.target.dayIndex];
+    const patch = buildMovePatch(kb.task, { date, startMin: kb.target.startMin });
+    if (!patch) {
+      setAnnouncement(MOVE_CANCELLED);
+      return;
+    }
+    const oldId = kb.task.occurrenceId;
+    flipFrom(oldId);
+    pendingFocusRef.current = oldId;
+    setAnnouncement(describeDrop(kb.task, date, kb.target.startMin));
+    commitMove(kb.task, patch).then((saved) => {
+      // After the refetch it renders as `${_id}_${date}` (new _id if it was a detached
+      // recurring occurrence) - follow it there, unless focus already moved on.
+      if (saved && document.activeElement?.dataset?.dragFocus === oldId) {
+        pendingFocusRef.current = `${saved._id}_${patch.date}`;
+      }
+    });
+  }
+
+  function handleItemKeyDown(e, task, kind, dayIndex) {
+    if (!latestRef.current.onMoveTask || e.altKey || e.ctrlKey || e.metaKey) return;
+    const kb = keyboardRef.current?.task.occurrenceId === task.occurrenceId ? keyboardRef.current : null;
+
+    if (kb && e.key === 'Enter') {
+      e.preventDefault(); // don't also "click" the button (that opens the modal)
+      commitKeyboardMove();
+      return;
+    }
+    if (kb && e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelKeyboardMove();
+      return;
+    }
+    if (gestureRef.current) return; // a pointer drag is in progress
+    if (!kb && pendingRef.current.has(task.occurrenceId)) return; // same rule as pointer drags
+
+    const span = taskSpan(task);
+    const current = kb ? kb.target : { dayIndex, startMin: kind === 'timed' ? span.start : null };
+    const next = stepKeyboardTarget(current, e.key, {
+      kind,
+      duration: span.duration,
+      dayCount: latestRef.current.days.length,
+    });
+    if (!next) return; // not an arrow we handle - leave the key alone (e.g. up/down scroll in the strip)
+    e.preventDefault();
+    keyboardRef.current = { task, kind, originDayIndex: dayIndex, target: next };
+    setDragState({ task, kind, source: 'keyboard', originDayIndex: dayIndex, ...next });
+    setAnnouncement(describeTarget(task, latestRef.current.days[next.dayIndex], next.startMin));
+  }
+
+  /** Props for an item's focusable button (.task-block-body / .chip-body / .todo-body). */
+  function getHandleProps(task, kind, dayIndex) {
+    return {
+      'data-drag-focus': task.occurrenceId,
+      'aria-describedby': hintId,
+      onKeyDown: (e) => handleItemKeyDown(e, task, kind, dayIndex),
+      onBlur: () => {
+        if (keyboardRef.current?.task.occurrenceId === task.occurrenceId) cancelKeyboardMove();
+      },
+    };
+  }
+
   /** Props for an item's outer element (.task-block / .chip / .todo-item). */
   function getBlockProps(task, kind, dayIndex, { onContextMenu } = {}) {
     return {
@@ -351,5 +454,5 @@ export function useTaskDrag({ days, rowHeight, tasks, rootRef, gridRef, headerRe
     };
   }
 
-  return { displayTasks, dragState, getBlockProps };
+  return { displayTasks, dragState, announcement, hintId, getBlockProps, getHandleProps };
 }

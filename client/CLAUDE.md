@@ -53,7 +53,42 @@ entre eles.
   tarefas com horário sobreposto (mesmo princípio do Google Calendar:
   clusters de sobreposição, cada tarefa vira `{ col, totalCols }`).
 - `date.js` — `getDays(start, count)` e `getWeekDays` (caso particular,
-  `count=7`); `formatDaysRangeLabel`/`formatWeekRangeLabel` no mesmo padrão.
+  `count=7`); `formatDaysRangeLabel`/`formatWeekRangeLabel` no mesmo padrão;
+  `timeToMinutes`/`minutesToTime` (ida e volta "HH:MM" ↔ minutos).
+- `hooks/useTaskDrag.js` + `utils/drag.js` — arrastar e soltar na visão Semana
+  (ver seção abaixo). `drag.js` é a matemática pura (snap, limites, ponteiro →
+  dia, patch, textos falados); o hook é a máquina de estados (ponteiro, toque,
+  teclado, otimista, foco). `App.handleMoveTask` salva.
+
+## Arrastar e soltar (visão Semana)
+
+Decisões do usuário — não "consertar" sem confirmar:
+
+- Só dentro dos dias **visíveis** daquele `WeekView` (7 no desktop, 1/3/7 no
+  celular); nunca salta semana. Snap de **15 min**, duração mantida, fim ≤ 23:59.
+- Tarefa com horário muda dia/horário; "dia todo" e ToDo só mudam de dia e
+  ficam na faixa do topo.
+- Recorrente: arrastar move **só aquela ocorrência** (`scope: 'single'`, payload
+  completo porque o servidor cria a avulsa a partir do body, incluindo
+  `completed`). Série inteira continua sendo pelo modal.
+- Mouse: começa depois de 4px (clique abre o modal). Toque: **toque longo
+  450ms** (toque rápido abre o modal, deslizar rola). Por isso o toque longo
+  **não conclui mais** no Android, e em telas `hover: none` a bolinha de
+  concluir fica sempre visível.
+- Teclado: setas ↑↓ (±15 min) e ←→ (±1 dia) com o botão do item focado, Enter
+  salva, Esc/sair do foco cancela; região `aria-live` anuncia cada passo.
+
+Implementação que não é óbvia:
+
+- O bloco segue o ponteiro via `transform` escrito direto no DOM a cada frame;
+  `setState` só quando o encaixe muda. Soltar é otimista (`pending` no hook) e
+  só é limpo quando chega um refetch **depois** do save confirmar.
+- O `touchmove` que trava a rolagem durante o arraste é um listener
+  **permanente** e não-passivo no `<section>` do `WeekView` — registrar só na
+  hora de começar não é confiável no iOS.
+- Rolagem automática só na direção em que o ponteiro foi (pegar um bloco que já
+  está na borda não pode sair rolando).
+- Testes: `npm test` (`node:test`, sem dependência) cobre `utils/*.test.js`.
 
 ## Fluxo de auth no front
 
