@@ -3,6 +3,7 @@ import Task from '../models/Task.js';
 import Category from '../models/Category.js';
 import { expandTasks } from '../utils/recurrence.js';
 import { parseDateOnly, timeToMinutes, toDateOnlyString } from '../utils/date.js';
+import { splitBacklog } from '../utils/backlog.js';
 
 const UNCATEGORIZED_COLOR = '#a8a29e';
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
@@ -120,19 +121,6 @@ async function resolveCategory(userId, { category, categoryColor, categoryId }) 
 async function findYearGoal(userId, goalId) {
   if (!mongoose.isObjectIdOrHexString(goalId)) return null;
   return Task.findOne({ _id: goalId, userId, isGoal: true, goalPeriod: 'year' });
-}
-
-// pending = no date yet, oldest first. overdue ("Ficou pra tras") = came from
-// the backlog, got a day before today and wasn't done, oldest day first.
-// ToDos created straight on a day are never overdue (see CLAUDE.md).
-function splitBacklog(tasks, today) {
-  const todayMs = new Date(today).getTime();
-  const byCreated = (a, b) => new Date(a.createdAt) - new Date(b.createdAt);
-  const pending = tasks.filter((t) => !t.date && !t.completed).sort(byCreated);
-  const overdue = tasks
-    .filter((t) => t.scheduledFromBacklog && !t.completed && t.date && new Date(t.date).getTime() < todayMs)
-    .sort((a, b) => new Date(a.date) - new Date(b.date) || byCreated(a, b));
-  return { pending, overdue };
 }
 
 // "today" comes from the client: which day it is depends on the user's local
