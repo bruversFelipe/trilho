@@ -5,6 +5,7 @@ import { connectDB } from './config/db.js';
 import taskRoutes from './routes/taskRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import goalRoutes from './routes/goalRoutes.js';
 import { requireAuth } from './middleware/auth.js';
 
 const app = express();
@@ -15,6 +16,7 @@ app.use(express.json());
 app.use('/auth', authRoutes);
 app.use('/tasks', requireAuth, taskRoutes);
 app.use('/categories', requireAuth, categoryRoutes);
+app.use('/goals', requireAuth, goalRoutes);
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 

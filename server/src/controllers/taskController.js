@@ -1,9 +1,11 @@
+import mongoose from 'mongoose';
 import Task from '../models/Task.js';
 import Category from '../models/Category.js';
 import { expandTasks } from '../utils/recurrence.js';
 import { parseDateOnly, timeToMinutes, toDateOnlyString } from '../utils/date.js';
 
 const UNCATEGORIZED_COLOR = '#a8a29e';
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 async function fetchOccurrences(userId, rangeStart, rangeEnd) {
   // Non-recurring tasks strictly in range, OR any recurring task that could
@@ -113,6 +115,43 @@ async function resolveCategory(userId, { category, categoryColor, categoryId }) 
   return null;
 }
 
+// A goalId is only valid if it's one of this user's year goals. Malformed ids
+// are rejected here (null) instead of reaching a query and failing with a 500.
+async function findYearGoal(userId, goalId) {
+  if (!mongoose.isObjectIdOrHexString(goalId)) return null;
+  return Task.findOne({ _id: goalId, userId, isGoal: true, goalPeriod: 'year' });
+}
+
+// pending = no date yet, oldest first. overdue ("Ficou pra tras") = came from
+// the backlog, got a day before today and wasn't done, oldest day first.
+// ToDos created straight on a day are never overdue (see CLAUDE.md).
+function splitBacklog(tasks, today) {
+  const todayMs = new Date(today).getTime();
+  const byCreated = (a, b) => new Date(a.createdAt) - new Date(b.createdAt);
+  const pending = tasks.filter((t) => !t.date && !t.completed).sort(byCreated);
+  const overdue = tasks
+    .filter((t) => t.scheduledFromBacklog && !t.completed && t.date && new Date(t.date).getTime() < todayMs)
+    .sort((a, b) => new Date(a.date) - new Date(b.date) || byCreated(a, b));
+  return { pending, overdue };
+}
+
+// "today" comes from the client: which day it is depends on the user's local
+// clock, never on the server's (see the date model in CLAUDE.md).
+export async function getBacklog(req, res) {
+  const { today } = req.query;
+  if (typeof today !== 'string' || !DATE_ONLY.test(today) || Number.isNaN(parseDateOnly(today).getTime())) {
+    return res.status(400).json({ error: 'today query param is required (YYYY-MM-DD)' });
+  }
+
+  const candidates = await Task.find({
+    userId: req.userId,
+    completed: false,
+    $or: [{ date: null }, { scheduledFromBacklog: true }],
+  });
+
+  res.json(splitBacklog(candidates, parseDateOnly(today)));
+}
+
 export async function listTasks(req, res) {
   const { start, end } = req.query;
   if (!start || !end) {
@@ -160,6 +199,9 @@ export async function getStats(req, res) {
 export async function createTask(req, res) {
   const body = req.body;
   if (!body.title) return res.status(400).json({ error: 'title is required' });
+  if (body.goalId && !(await findYearGoal(req.userId, body.goalId))) {
+    return res.status(400).json({ error: 'goalId invalido' });
+  }
 
   const category = await resolveCategory(req.userId, body);
 
@@ -170,6 +212,7 @@ export async function createTask(req, res) {
       description: body.description || '',
       date: body.date ? new Date(body.date) : null, // no date = backlog item
       goalPeriod: body.goalPeriod === 'year' ? 'year' : 'week',
+      goalId: body.goalId || null,
       startTime: body.startTime || null,
       endTime: body.endTime || null,
       allDay: !!body.allDay,
@@ -202,6 +245,10 @@ export async function updateTask(req, res) {
     return detachOccurrence(req, res, task, body);
   }
 
+  if (body.goalId && !(await findYearGoal(req.userId, body.goalId))) {
+    return res.status(400).json({ error: 'goalId invalido' });
+  }
+
   if (body.category !== undefined || body.categoryId !== undefined) {
     const category = await resolveCategory(req.userId, body);
     if (category) {
@@ -224,6 +271,8 @@ export async function updateTask(req, res) {
   for (const key of assignable) {
     if (body[key] !== undefined) task[key] = body[key];
   }
+
+  if (body.goalId !== undefined) task.goalId = body.goalId || null;
 
   if (body.date !== undefined) {
     const wasBacklog = !task.date;
@@ -302,8 +351,15 @@ export async function deleteTask(req, res) {
     }
   }
 
-  const deleted = await Task.findOneAndDelete({ _id: id, userId: req.userId });
-  if (!deleted) return res.status(404).json({ error: 'Task not found' });
+  const task = await Task.findOne({ _id: id, userId: req.userId });
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+
+  // Deleting a year goal keeps its linked tasks - they only lose the link.
+  if (task.isGoal && task.goalPeriod === 'year') {
+    await Task.updateMany({ userId: req.userId, goalId: task._id }, { $set: { goalId: null } });
+  }
+
+  await Task.deleteOne({ _id: task._id, userId: req.userId });
   res.status(204).send();
 }
 
