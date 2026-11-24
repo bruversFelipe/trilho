@@ -78,6 +78,18 @@ export function getStats(start, end) {
   return request(`/tasks/stats?start=${start}&end=${end}`);
 }
 
+// `today` is dateKey(today()): which day it is comes from the user's local clock,
+// so the server never guesses it (see the date model in CLAUDE.md).
+export function getBacklog(today) {
+  if (!getToken()) return Promise.resolve({ pending: [], overdue: [] });
+  return request(`/tasks/backlog?today=${today}`);
+}
+
+export function getGoals(year) {
+  if (!getToken()) return Promise.resolve([]);
+  return request(`/goals?year=${year}`);
+}
+
 export function createTask(task) {
   return request('/tasks', { method: 'POST', body: JSON.stringify(task) });
 }

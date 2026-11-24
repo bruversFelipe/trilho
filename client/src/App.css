@@ -97,8 +97,15 @@
     gap: 2px;
   }
 
+  /* Four tabs + Hoje + Sair don't fit next to "T R I L H O" at this width: keep
+     only the logo. Hidden visually but still read by screen readers (sr-only). */
   .brand-name {
-    font-size: 11px;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .tabs button {
@@ -908,6 +915,84 @@ body.is-task-dragging {
   color: var(--text-dim);
   font-size: 13px;
   width: calc(100% - 24px);
+}
+
+/* ---- Pendencias tab (BacklogView): reuses the goals panel pieces above ---- */
+.backlog-year-picker,
+.backlog-filter {
+  display: flex;
+  gap: 4px;
+}
+
+.backlog-filter {
+  overflow-x: auto;
+  padding: 0 12px 4px;
+}
+
+.backlog-year-picker > .density-option,
+.backlog-filter > .density-option {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+/* Year goal progress: a 4px track (first span) with its fill, then "3/7" */
+.goal-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.goal-progress > span:first-child {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.goal-progress > span:first-child > span {
+  display: block;
+  height: 100%;
+  background: var(--chip-color, var(--text));
+}
+
+.goal-progress-label,
+.backlog-date {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* Headings here are sentences ("Ficou pra tras"), not month names to capitalize */
+.backlog-view .period-label {
+  text-transform: none;
+}
+
+/* Title and actions are separate buttons inside .goal-text: line them up with
+   the text around them (no default button padding) */
+.backlog-view button.goal-title-row,
+.backlog-actions .link-btn {
+  padding: 0;
+  text-align: left;
+}
+
+.backlog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+/* The quick-add inputs open in place of their .add-goal-btn - same box, solid border */
+.backlog-add-input {
+  margin: 8px 12px;
+  padding: 10px;
+  border: 1px solid var(--text);
+  border-radius: 8px;
+  font-size: 13px;
+  width: calc(100% - 24px);
+  background: var(--surface);
+  color: var(--text);
 }
 
 /* ---- Time-usage stats bar (footer of the goals panel) ---- */

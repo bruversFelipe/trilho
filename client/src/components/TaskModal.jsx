@@ -1,12 +1,7 @@
 import { useState } from 'react';
-import { dateKey, today, WEEKDAY_LABELS } from '../utils/date.js';
+import { dateKey, formatShortDate, today, WEEKDAY_LABELS } from '../utils/date.js';
 
 const DEFAULT_COLOR = '#6366f1';
-
-function formatShortDate(date) {
-  const d = new Date(date);
-  return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-}
 
 function buildInitialState(task, defaultDate, forceGoal, defaultStartTime, defaultEndTime) {
   if (task) {

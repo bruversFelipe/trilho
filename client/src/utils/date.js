@@ -100,6 +100,12 @@ export function formatDaysRangeLabel(start, count) {
     : `${startLabel} de ${MONTH_LABELS[start.getUTCMonth()]} - ${endLabel}`;
 }
 
+/** "DD/MM" for a calendar day. */
+export function formatShortDate(date) {
+  const d = new Date(date);
+  return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 export function timeToMinutes(time) {
   if (!time) return null;
   const [h, m] = time.split(':').map(Number);

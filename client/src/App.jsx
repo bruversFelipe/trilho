@@ -4,8 +4,10 @@ import GoalsPanel from './components/GoalsPanel.jsx';
 import TaskModal from './components/TaskModal.jsx';
 import AuthModal from './components/AuthModal.jsx';
 import DensityPicker from './components/DensityPicker.jsx';
+import BacklogView from './components/BacklogView.jsx';
 import {
   getCategories,
+  getGoals,
   createTask,
   updateTask,
   deleteTask,
@@ -26,7 +28,7 @@ function loadStoredDayCount() {
 }
 
 function App() {
-  const [tab, setTab] = useState('week'); // 'week' | 'month' | 'goals'
+  const [tab, setTab] = useState('week'); // 'week' | 'month' | 'goals' | 'backlog'
   const [focusDate, setFocusDate] = useState(() => today());
   // The week currently at the top of the week-view scroll - the goals panel follows
   // this instead of focusDate, so scrolling ahead lets you add goals for future weeks.
@@ -36,6 +38,9 @@ function App() {
   // hides the picker there and the week view always renders 7 days regardless).
   const [dayCount, setDayCount] = useState(loadStoredDayCount);
   const [categories, setCategories] = useState([]);
+  // Year goals of the current and the next year, with computed progress - feed the
+  // Pendencias tab and the goal select in the task modal.
+  const [yearGoals, setYearGoals] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [modalState, setModalState] = useState(null); // { task, defaultDate, forceGoal } | null
   const [jumpToken, setJumpToken] = useState(0);
@@ -52,12 +57,27 @@ function App() {
     loadCategories();
   }, [loadCategories]);
 
+  useEffect(() => {
+    if (!authUser) return;
+    let cancelled = false;
+    const year = today().getUTCFullYear();
+    Promise.all([getGoals(year), getGoals(year + 1)])
+      .then(([current, next]) => {
+        if (!cancelled) setYearGoals([...current, ...next]);
+      })
+      .catch(console.error);
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey, authUser]);
+
   // The API client clears the session and fires this if any request comes back 401
   // (e.g. an old/invalid token) - drop back to the auth modal when that happens.
   useEffect(() => {
     function handleUnauthorized() {
       setAuthUser(null);
       setCategories([]);
+      setYearGoals([]);
     }
     window.addEventListener('trilho:unauthorized', handleUnauthorized);
     return () => window.removeEventListener('trilho:unauthorized', handleUnauthorized);
@@ -77,6 +97,7 @@ function App() {
     clearSession();
     setAuthUser(null);
     setCategories([]);
+    setYearGoals([]);
     bump();
   }
 
@@ -116,6 +137,46 @@ function App() {
   async function handleAddTodo(day, title) {
     try {
       await createTask({ title, date: dateKey(day), isTodo: true });
+      bump();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Erro ao salvar');
+    }
+  }
+
+  // Quick-add in the Pendencias tab: a task with no date. `category` is the one
+  // the list is filtered by (or null), so the new item stays in view.
+  async function handleAddPending(title, category) {
+    try {
+      await createTask({
+        title,
+        date: null,
+        category: category?.name || '',
+        categoryId: category?._id || null,
+        categoryColor: category?.color,
+      });
+      bump();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Erro ao salvar');
+    }
+  }
+
+  // "+ Meta do ano": the server pins it to Jan 1 UTC of that year.
+  async function handleAddYearGoal(year, title) {
+    try {
+      await createTask({ title, isGoal: true, goalPeriod: 'year', date: `${year}-01-01` });
+      bump();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Erro ao salvar');
+    }
+  }
+
+  // "Voltar pras pendencias": date null puts it back in the backlog.
+  async function handleMoveToBacklog(task) {
+    try {
+      await updateTask(task._id, { date: null });
       bump();
     } catch (err) {
       console.error(err);
@@ -182,7 +243,8 @@ function App() {
 
   async function handleToggleComplete(task) {
     try {
-      await completeTask(task._id, dateKey(task.date), !task.completed);
+      // Backlog items have no date (the server only needs it for recurring tasks)
+      await completeTask(task._id, task.date ? dateKey(task.date) : null, !task.completed);
       bump();
     } catch (err) {
       console.error(err);
@@ -227,6 +289,9 @@ function App() {
             >
               Metas
             </button>
+            <button className={tab === 'backlog' ? 'is-active' : ''} onClick={() => setTab('backlog')}>
+              Pendencias
+            </button>
           </div>
           <div className="header-actions">
             <button className="today-btn" onClick={handleGoToday}>
@@ -267,6 +332,18 @@ function App() {
                 onEditTask={handleEditTask}
                 onToggleComplete={handleToggleComplete}
                 onSelectDay={handleSelectDay}
+              />
+            )}
+            {tab === 'backlog' && (
+              <BacklogView
+                refreshKey={refreshKey}
+                goals={yearGoals}
+                categories={categories}
+                onEditTask={handleEditTask}
+                onToggleComplete={handleToggleComplete}
+                onAddPending={handleAddPending}
+                onAddYearGoal={handleAddYearGoal}
+                onMoveToBacklog={handleMoveToBacklog}
               />
             )}
             {tab === 'goals' && (
