@@ -11,11 +11,16 @@ Sempre seguir para qualquer feature nova:
 ```
 src/
   models/       Schemas Mongoose (User, Task, Category)
-  controllers/  Lógica de negócio, uma função por endpoint
-  routes/       Só wiring de Router + asyncHandler, zero lógica
+  controllers/  Lógica de negócio, uma função por endpoint (task, category, auth, goal)
+  routes/       Só wiring de Router + asyncHandler, zero lógica (taskRoutes, goalRoutes, ...)
   middleware/   requireAuth (JWT)
-  utils/        Funções puras reaproveitáveis (date, slug, recurrence, exampleData)
+  utils/        Funções puras reaproveitáveis (date, slug, recurrence, exampleData,
+                backlog, goals) — testadas com node:test (*.test.js)
 ```
+
+Testes: `npm test` (`node --test`, sem dependência) roda `src/**/*.test.js`.
+Regra pura nova (filtro, cálculo) vai pra `utils/` com teste, sem importar
+Mongoose — o controller só busca e chama.
 
 ## Convenções
 
@@ -23,8 +28,8 @@ src/
   rejeição de Promise sozinho — sem isso, um erro assíncrono trava a
   request).
 - **Multi-tenant desde a raiz**: `Task` e `Category` têm `userId`
-  obrigatório. `requireAuth` middleware protege `/tasks` e `/categories`
-  inteiros e injeta `req.userId`. **Toda query nova precisa filtrar por
+  obrigatório. `requireAuth` middleware protege `/tasks`, `/categories` e
+  `/goals` inteiros e injeta `req.userId`. **Toda query nova precisa filtrar por
   `req.userId`**, e todo `findById`/update/delete precisa ser
   `findOne({ _id, userId: req.userId })` — nunca `findById(id)` sozinho,
   senão um usuário edita/vê dado de outro. Isso é o requisito de segurança
@@ -47,12 +52,38 @@ memória por `utils/recurrence.js` (`expandTasks`) toda vez que
   preservar esse array — nunca sobrescrever `task.recurrence` inteiro sem
   copiar `excludedDates` primeiro.
 
-## ToDos (implementação)
+## Formato de cada tipo de Task: `normalizeTask`
 
-`normalizeTodo` em `taskController.js` roda em `createTask`, `updateTask` e
-`detachOccurrence`: se `isTodo`, força `allDay: true`, horários `null`,
-`isGoal: false` e recorrência desligada (preservando `excludedDates`). Qualquer
-novo caminho que crie/salve `Task` precisa passar por ele também.
+`normalizeTask` em `taskController.js` roda em `createTask`, `updateTask` e
+`detachOccurrence`. **Todo caminho novo que cria/salva `Task` precisa passar
+por ele.** Funciona em objeto puro (antes do create) e em documento Mongoose
+(antes do save). A cadeia, nesta ordem:
+
+1. `normalizeBacklog`: se `date` é vazio → `date: null`, `allDay`, horários
+   `null`, nunca meta/ToDo, `goalPeriod: 'week'`, `scheduledFromBacklog:
+   false`, recorrência desligada.
+2. `normalizeTodo`: se `isTodo` → `allDay`, horários `null`, `isGoal: false`,
+   recorrência desligada.
+3. `normalizeGoal`: não-meta → `goalPeriod: 'week'`. Meta anual → data em
+   1º/jan UTC do ano dela, `allDay`, sem horário, sem recorrência.
+4. Vínculos: meta ou recorrente → `scheduledFromBacklog: false`, `goalId:
+   null`.
+
+Recorrência desligada sempre por `disableRecurrence`, que preserva
+`excludedDates`.
+
+- `updateTask` trata `date: null` explicitamente (volta pras pendências) e liga
+  `scheduledFromBacklog` quando a tarefa não tinha data e recebe uma.
+  `goalPeriod` e `scheduledFromBacklog` não estão em `assignable`.
+- `findYearGoal(userId, goalId)`: `isObjectIdOrHexString` primeiro (id
+  malformado nunca chega na query), depois `findOne({ _id, userId, isGoal:
+  true, goalPeriod: 'year' })`. `null` → 400 `goalId invalido`, checado antes
+  do `resolveCategory` (que pode criar categoria).
+- `deleteTask` de meta anual: `updateMany({ userId, goalId }, { goalId: null })`
+  antes do `deleteOne`.
+- `GET /tasks/backlog` fica registrada antes de qualquer `GET /:id` futuro em
+  `taskRoutes`. Regras puras em `utils/backlog.js` (`splitBacklog`) e
+  `utils/goals.js` (`withProgress`).
 
 ## Autenticação
 

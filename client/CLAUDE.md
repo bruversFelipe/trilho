@@ -8,7 +8,7 @@ implementação do frontend.
 
 ```
 components/   Um componente por arquivo, CSS em App.css (sem CSS modules/styled-components)
-hooks/        useTasksForRange (fetch + cache simples por range)
+hooks/        useTasksForRange (fetch + cache simples por range), useBacklog (pendências)
 api/          api.js: único client HTTP, gerencia token no localStorage
 utils/        date.js, greeting.js, layout.js — funções puras, sem estado
 ```
@@ -20,8 +20,10 @@ a lógica que você precisa já exista em algum desses.** Não duplicar lógica
 entre eles.
 
 - `App.jsx` — dono de todo estado global (auth, tab ativa, focusDate,
-  visibleWeekStart, dayCount, modal aberto). Componentes filhos são "burros",
-  recebem callbacks.
+  visibleWeekStart, dayCount, modal aberto, `yearGoals`). Componentes filhos
+  são "burros", recebem callbacks. `yearGoals` = metas anuais do ano atual e
+  do seguinte (`GET /goals` x2, recarrega com `refreshKey`): alimentam a aba
+  Pendências e o select de meta do `TaskModal`.
 - `CalendarScroller.jsx` — scroll infinito genérico (funciona pra Semana e
   Mês), decide quando prependar/appendar período via `IntersectionObserver`,
   e reporta qual período está no topo da tela via `onVisiblePeriodChange`
@@ -36,7 +38,19 @@ entre eles.
   aquela coluna — existe porque todas as colunas dividem a altura da linha.
   `TodoQuickAdd.jsx` é o "+ todo" de cada coluna (input inline; Enter salva e
   continua aberto). ToDo é editado no `TaskModal` em modo enxuto (título,
-  descrição, categoria, data) e nunca é criado pelo modal.
+  descrição, categoria, meta do ano, data) e nunca é criado pelo modal — a
+  única exceção é **converter** uma pendência existente em ToDo pelo bloco
+  Agendar (ver `TaskModal` abaixo). `TodoQuickAdd` aceita `label`,
+  `placeholder`, `buttonClassName` e `inputClassName` (defaults = "+ todo" da
+  semana); a aba Pendências reusa ele pra "+ Pendencia" e "+ Meta do ano".
+- `BacklogView.jsx` — aba "Pendencias" (4ª aba). De cima pra baixo: "Metas de
+  {ano}" (segmentado ano atual/seguinte, barra de progresso
+  `linkedDone/linkedTotal` vinda do servidor), "Ficou pra tras" (só aparece
+  com item; concluir, reagendar no modal, voltar pras pendências) e
+  "Pendencias" (chips de categoria com `.density-option`; adicionar rápido
+  com filtro ativo cria naquela categoria pra o item não sumir). Busca as
+  pendências via `useBacklog(refreshKey)`, que manda `today` = data local;
+  metas vêm do `App` por prop.
 - `NowIndicator.jsx` — linha vermelha da hora atual, renderizada só na coluna
   de hoje do `WeekView`; tem o próprio relógio (30s) pra não re-renderizar a
   grade.
@@ -49,6 +63,19 @@ entre eles.
 - `TaskModal.jsx` — form de criar/editar tarefa ou meta; quando edita uma
   ocorrência de série recorrente, mostra o seletor "somente este dia / toda a
   série" (`editScope`) que decide se o payload leva `scope`/`occurrenceDate`.
+  `buildPayload()` monta o payload de cada modo:
+  - **Pendência** (`task.date == null`, ou `defaultBacklog` no "+" da aba
+    Pendências): sem campo Data/horário/recorrência/meta semanal. Editando,
+    mostra o bloco **Agendar** (`[Sem data | Hoje | Amanha]` + data +
+    "Com horario"): sem horário vira ToDo, com horário vira tarefa normal.
+    "Nova pendencia" não tem Agendar — salva sempre sem data.
+  - **Meta do ano** (`goalPeriod: 'year'`): só título, descrição e categoria,
+    mais a lista só-leitura de `linkedTasks`.
+  - **Select "Meta do ano"** em tarefa normal, ToDo e pendência (escondido em
+    meta e com recorrência ligada). `goalId` fora das opções vira "Meta de
+    outro ano" em vez de ser perdido no save.
+  - **"Voltar pras pendencias"** quando `task.scheduledFromBacklog` (manda o
+    payload com `date: null`).
 - `layout.js` (`layoutDayEvents`) — algoritmo de divisão de colunas pra
   tarefas com horário sobreposto (mesmo princípio do Google Calendar:
   clusters de sobreposição, cada tarefa vira `{ col, totalCols }`).
@@ -114,7 +141,10 @@ qualquer request dispara o evento `trilho:unauthorized` (ver `api.js`), que o
 - Header/marca sempre grafada **"T R I L H O"** (espaçada, letra por letra) —
   pedido explícito do usuário, não "corrigir" pra "Trilho" junto.
 - Mobile-first: breakpoints do header em `App.css` (`480px`, `360px`) —
-  qualquer elemento novo no header precisa ser testado nesses tamanhos.
+  qualquer elemento novo no header precisa ser testado nesses tamanhos. Com 4
+  abas (Semana/Mes/Metas/Pendencias), em telas de até 360px o texto
+  "T R I L H O" fica escondido (estilo sr-only, continua lido por leitor de
+  tela) e só o logo aparece — decisão de 2026-11-24, medida em 360/480/1280.
   Breakpoint mobile-vs-desktop geral do app é `900px` (painel de Metas vira
   sidebar fixa, `DensityPicker` some).
 - Segmentados (grupo de botões tipo toggle) seguem sempre o mesmo padrão

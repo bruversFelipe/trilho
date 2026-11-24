@@ -78,10 +78,12 @@ senha — isso já cria 2 categorias e 2 compromissos de exemplo na semana atual
 | GET    | `/categories`                 | sim  | Lista categorias do usuário logado                      |
 | POST   | `/categories`                 | sim  | Cria categoria (`{ name, color }`)                       |
 | GET    | `/tasks?start=&end=`          | sim  | Lista tarefas do usuário no período, já expandindo recorrências |
-| POST   | `/tasks`                      | sim  | Cria tarefa                                              |
-| PUT    | `/tasks/:id`                  | sim  | Edita tarefa (a série inteira, se recorrente)            |
+| GET    | `/tasks/backlog?today=`       | sim  | Pendências (`pending`) e o que foi agendado delas e ficou pra trás (`overdue`); `today` é a data local do usuário |
+| POST   | `/tasks`                      | sim  | Cria tarefa (sem `date` = pendência)                     |
+| PUT    | `/tasks/:id`                  | sim  | Edita tarefa (a série inteira, se recorrente); `date: null` volta pras pendências |
 | DELETE | `/tasks/:id`                  | sim  | Remove tarefa                                            |
 | PATCH  | `/tasks/:id/complete`         | sim  | Marca/desmarca conclusão (`{ date }` para ocorrência específica) |
+| GET    | `/goals?year=`                | sim  | Metas do ano com progresso calculado (`linkedTotal`, `linkedDone`, `linkedTasks`) |
 
 Rotas com "Auth: sim" exigem `Authorization: Bearer <token>` e só enxergam
 dados do próprio usuário (tentar editar/excluir uma tarefa de outra conta
