@@ -8,8 +8,12 @@ const UNCATEGORIZED_COLOR = '#a8a29e';
 async function fetchOccurrences(userId, rangeStart, rangeEnd) {
   // Non-recurring tasks strictly in range, OR any recurring task that could
   // possibly still be active by rangeEnd (started before rangeEnd, no earlier endDate).
+  // Year goals are left out: they live on Jan 1 but belong to the whole year,
+  // so they'd otherwise show up in the GoalsPanel of the week containing Jan 1.
+  // Backlog items (date: null) never match the date ranges below.
   const tasks = await Task.find({
     userId,
+    goalPeriod: { $ne: 'year' },
     $or: [
       { 'recurrence.enabled': { $ne: true }, date: { $gte: rangeStart, $lte: rangeEnd } },
       {
@@ -23,6 +27,33 @@ async function fetchOccurrences(userId, rangeStart, rangeEnd) {
   return expandTasks(tasks, rangeStart, rangeEnd);
 }
 
+// Turns recurrence off but keeps excludedDates (past detached occurrences).
+function disableRecurrence(task) {
+  task.recurrence = {
+    enabled: false,
+    daysOfWeek: [],
+    endDate: null,
+    excludedDates: task.recurrence?.excludedDates || [],
+  };
+}
+
+// A backlog item ("pendencia") has no day yet, so it can't have a time, repeat,
+// be a ToDo or be a goal. Works on both a plain object (before create) and a
+// Mongoose document (before save), like normalizeTodo.
+function normalizeBacklog(task) {
+  if (task.date) return task;
+  task.date = null;
+  task.allDay = true;
+  task.startTime = null;
+  task.endTime = null;
+  task.isGoal = false;
+  task.isTodo = false;
+  task.goalPeriod = 'week';
+  task.scheduledFromBacklog = false;
+  disableRecurrence(task);
+  return task;
+}
+
 // A ToDo is always a one-off, time-less note on a day - enforce that here so no
 // client payload can turn one into a timed, recurring or goal task. Works on both
 // a plain object (before create) and a Mongoose document (before save).
@@ -32,12 +63,35 @@ function normalizeTodo(task) {
   task.startTime = null;
   task.endTime = null;
   task.isGoal = false;
-  task.recurrence = {
-    enabled: false,
-    daysOfWeek: [],
-    endDate: null,
-    excludedDates: task.recurrence?.excludedDates || [],
-  };
+  disableRecurrence(task);
+  return task;
+}
+
+// A year goal lives on Jan 1 UTC of its year, all day, never repeats.
+// Anything that isn't a goal is a 'week' period (the default) so the field
+// can't leak into regular tasks.
+function normalizeGoal(task) {
+  if (!task.isGoal) task.goalPeriod = 'week';
+  if (task.goalPeriod !== 'year') return task;
+  task.date = new Date(Date.UTC(new Date(task.date).getUTCFullYear(), 0, 1));
+  task.allDay = true;
+  task.startTime = null;
+  task.endTime = null;
+  task.isTodo = false;
+  disableRecurrence(task);
+  return task;
+}
+
+// Every path that creates/saves a Task goes through here. Goals and recurring
+// tasks can't be linked to a year goal nor sit in "Ficou pra tras".
+function normalizeTask(task) {
+  normalizeBacklog(task);
+  normalizeTodo(task);
+  normalizeGoal(task);
+  if (task.isGoal || task.recurrence?.enabled) {
+    task.scheduledFromBacklog = false;
+    task.goalId = null;
+  }
   return task;
 }
 
@@ -106,16 +160,16 @@ export async function getStats(req, res) {
 export async function createTask(req, res) {
   const body = req.body;
   if (!body.title) return res.status(400).json({ error: 'title is required' });
-  if (!body.date) return res.status(400).json({ error: 'date is required' });
 
   const category = await resolveCategory(req.userId, body);
 
   const task = await Task.create(
-    normalizeTodo({
+    normalizeTask({
       userId: req.userId,
       title: body.title,
       description: body.description || '',
-      date: new Date(body.date),
+      date: body.date ? new Date(body.date) : null, // no date = backlog item
+      goalPeriod: body.goalPeriod === 'year' ? 'year' : 'week',
       startTime: body.startTime || null,
       endTime: body.endTime || null,
       allDay: !!body.allDay,
@@ -171,7 +225,12 @@ export async function updateTask(req, res) {
     if (body[key] !== undefined) task[key] = body[key];
   }
 
-  if (body.date !== undefined) task.date = new Date(body.date);
+  if (body.date !== undefined) {
+    const wasBacklog = !task.date;
+    // null/'' sends it back to the backlog - never new Date(null), which is 1970-01-01
+    task.date = body.date ? new Date(body.date) : null;
+    if (wasBacklog && task.date) task.scheduledFromBacklog = true;
+  }
 
   if (body.recurrence !== undefined) {
     task.recurrence = {
@@ -182,7 +241,7 @@ export async function updateTask(req, res) {
     };
   }
 
-  normalizeTodo(task);
+  normalizeTask(task);
   await task.save();
   res.json(task);
 }
@@ -195,11 +254,11 @@ async function detachOccurrence(req, res, seriesTask, body) {
   const category = await resolveCategory(req.userId, body);
 
   const detached = await Task.create(
-    normalizeTodo({
+    normalizeTask({
       userId: req.userId,
       title: body.title,
       description: body.description || '',
-      date: new Date(body.date),
+      date: body.date ? new Date(body.date) : null,
       startTime: body.startTime || null,
       endTime: body.endTime || null,
       allDay: !!body.allDay,
