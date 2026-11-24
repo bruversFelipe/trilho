@@ -971,6 +971,7 @@ body.is-task-dragging {
 
 /* Title and actions are separate buttons inside .goal-text: line them up with
    the text around them (no default button padding) */
+.backlog-view .goal-text,
 .backlog-view button.goal-title-row,
 .backlog-actions .link-btn {
   padding: 0;
@@ -1234,6 +1235,44 @@ body.is-task-dragging {
   color: var(--text-dim);
   text-decoration: underline;
   white-space: nowrap;
+}
+
+/* "Voltar pras pendencias" in the task modal: a link, not a full-width row */
+.move-to-backlog {
+  align-self: flex-start;
+  padding: 0;
+}
+
+/* Read-only list of the tasks linked to a year goal (task modal) */
+.linked-tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.linked-tasks li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.linked-tasks li > span:nth-child(2) {
+  flex: 1;
+}
+
+.linked-tasks li.is-done > span:nth-child(2) {
+  text-decoration: line-through;
+  color: var(--text-dim);
+}
+
+.linked-tasks li > span:last-child {
+  font-size: 11px;
+  color: var(--text-dim);
 }
 
 .weekday-picker {

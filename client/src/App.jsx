@@ -42,7 +42,7 @@ function App() {
   // Pendencias tab and the goal select in the task modal.
   const [yearGoals, setYearGoals] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [modalState, setModalState] = useState(null); // { task, defaultDate, forceGoal } | null
+  const [modalState, setModalState] = useState(null); // { task, defaultDate, forceGoal, backlog } | null
   const [jumpToken, setJumpToken] = useState(0);
   const [authUser, setAuthUser] = useState(() =>
     isAuthenticated() ? { username: getStoredUsername(), name: getStoredName() } : null
@@ -110,7 +110,9 @@ function App() {
   }
 
   function handleAddTask() {
-    if (tab === 'goals') {
+    if (tab === 'backlog') {
+      setModalState({ backlog: true }); // "Nova pendencia": no date
+    } else if (tab === 'goals') {
       setModalState({ defaultDate: visibleWeekStart, forceGoal: true });
     } else {
       setModalState({ defaultDate: focusDate, forceGoal: false });
@@ -222,9 +224,10 @@ function App() {
 
   async function handleDelete(task, scope) {
     const isSingleOccurrence = scope === 'single' && task.recurrence?.enabled;
-    const confirmMsg = isSingleOccurrence
-      ? `Excluir "${task.title}" so nesse dia?`
-      : `Excluir "${task.title}"?`;
+    const isYearGoal = task.isGoal && task.goalPeriod === 'year';
+    let confirmMsg = `Excluir "${task.title}"?`;
+    if (isSingleOccurrence) confirmMsg = `Excluir "${task.title}" so nesse dia?`;
+    else if (isYearGoal) confirmMsg = `Excluir a meta "${task.title}"? As tarefas ligadas continuam, so perdem o vinculo.`;
     if (!confirm(confirmMsg)) return;
 
     try {
@@ -382,6 +385,8 @@ function App() {
             defaultStartTime={modalState.defaultStartTime}
             defaultEndTime={modalState.defaultEndTime}
             forceGoal={modalState.forceGoal}
+            defaultBacklog={modalState.backlog}
+            goalOptions={yearGoals}
             categories={categories}
             onClose={() => setModalState(null)}
             onSave={handleSave}

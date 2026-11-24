@@ -66,7 +66,7 @@ export default function BacklogView({
           const pct = goal.linkedTotal ? Math.round((goal.linkedDone / goal.linkedTotal) * 100) : 0;
           return (
             <li key={goal._id} className="goal-item">
-              <div className="goal-text">
+              <button type="button" className="goal-text" onClick={() => onEditTask(goal)}>
                 <span className="goal-title-row">
                   <span className="goal-title">{goal.title}</span>
                   {goal.description && <NotesIcon className="notes-icon" />}
@@ -84,7 +84,7 @@ export default function BacklogView({
                     {goal.linkedDone}/{goal.linkedTotal}
                   </span>
                 </span>
-              </div>
+              </button>
             </li>
           );
         })}
@@ -180,7 +180,7 @@ export default function BacklogView({
                 onClick={() => onToggleComplete(task)}
                 aria-label="Marcar como concluida"
               />
-              <div className="goal-text">
+              <button type="button" className="goal-text" onClick={() => onEditTask(task)}>
                 <span className="goal-title-row">
                   <span className="goal-title">{task.title}</span>
                   {task.description && <NotesIcon className="notes-icon" />}
@@ -199,7 +199,7 @@ export default function BacklogView({
                     )}
                   </span>
                 )}
-              </div>
+              </button>
             </li>
           );
         })}
